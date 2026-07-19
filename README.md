@@ -1,1 +1,310 @@
-# Bynogame
+# Zade — CS2 Dijital Ürün Pazarı
+
+[![CI](https://github.com/L3x4-4/Bynogame/actions/workflows/ci.yml/badge.svg)](https://github.com/L3x4-4/Bynogame/actions/workflows/ci.yml)
+
+CS2 skinlerini güvenle alıp satabileceğiniz modern bir marketplace uygulaması.
+
+## Teknoloji Stack
+
+| Katman | Teknoloji |
+|--------|-----------|
+| **Frontend** | Next.js 15, React 19, TailwindCSS |
+| **Backend** | Express.js, TypeScript |
+| **Veritabanı** | MongoDB + Mongoose |
+| **Auth** | JWT (jsonwebtoken) + bcrypt |
+| **API** | Steam Web API, Steam Market |
+
+## Kurulum
+
+### 1. Bağımlılıkları Yükle
+
+```bash
+# Backend
+cd backend
+npm install
+
+# Frontend
+cd ../frontend
+npm install
+```
+
+### 2. Environment Değişkenlerini Ayarla
+
+`backend/.env` dosyasını düzenle:
+
+```env
+PORT=5000
+MONGO_URI=mongodb://localhost:27017/L3X4
+JWT_SECRET=<rastgele-guclu-bir-anahtar>
+EMAIL_USER=your@gmail.com
+EMAIL_PASS=<gmail-app-password>
+FRONTEND_URL=http://localhost:3000
+BACKEND_URL=http://localhost:5000
+STEAM_API_KEY=<steam-api-key>
+IYZICO_API_KEY=<iyzico-sandbox-api-key>
+IYZICO_SECRET_KEY=<iyzico-sandbox-secret-key>
+IYZICO_BASE_URL=https://sandbox-api.iyzipay.com
+ADMIN_EMAILS=admin@ornek.com
+```
+
+> **Not:** `ADMIN_EMAILS` içinde virgülle ayrılmış email adresleriyle register/login olan kullanıcılar otomatik olarak admin rolü alır ve `/admin` panelini görebilir.
+
+> **Not:** `JWT_SECRET` için `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` kullanabilirsin.
+> **Not:** iyzico sandbox API bilgilerini almak için `backend/API_SETUP.md` içindeki "iyzico Sandbox Kurulumu" bölümüne bakabilirsin. Para çekme talepleri şu an otomatik değil — bakiye anında düşülür ama transfer manuel/banka tarafında yapılması beklenir.
+
+Production'a deploy ederken `frontend`'de `NEXT_PUBLIC_SITE_URL` ortam değişkenini gerçek domain'e ayarla (örn. `https://zade.com`) — `sitemap.xml`, `robots.txt` ve Open Graph URL'leri bu değeri kullanır. Ayarlanmazsa `http://localhost:3000`'e düşer.
+
+### 3. Çalıştır
+
+```bash
+# Backend (port 5000)
+cd backend
+npm run dev
+
+# Frontend (port 3000)
+cd frontend
+npm run dev
+```
+
+## Docker ile Çalıştırma
+
+Backend, frontend, MongoDB ve Redis'i Docker Compose ile tek komutla ayağa kaldırabilirsin. Her iki ortamda da bir **Nginx** reverse proxy tüm trafiği tek bir port üzerinden yönetir (`/api/*` → backend, diğer her şey → frontend).
+
+### Gereksinimler
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) kurulu ve çalışıyor olmalı.
+
+### 1. Environment dosyalarını hazırla
+
+```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+```
+
+`backend/.env` içindeki secret'ları (JWT_SECRET, EMAIL_*, STEAM_API_KEY, IYZICO_*, ADMIN_EMAILS) doldur. `frontend/.env` dosyasındaki değerler Docker ortamında `docker-compose*.yml` tarafından otomatik override edilir, boş bırakılabilir.
+
+### 2. Geliştirme ortamı (hot-reload)
+
+```bash
+docker compose up --build
+```
+
+- Uygulama: http://localhost:8080 (Nginx üzerinden — frontend + `/api`)
+- Frontend direkt: http://localhost:3000
+- Backend direkt: http://localhost:5000
+- MongoDB: `localhost:27017`
+- Redis: `localhost:6379` (dağıtık rate limiting store — `REDIS_URL` container'larda otomatik ayarlanır)
+
+Kaynak kod (`backend/src`, `frontend/src`) host'tan container'a mount edilir; değişiklikler anında yansır (frontend Turbopack HMR, backend değişikliği için container'ı yeniden başlatman gerekir çünkü `ts-node` watch modunda çalışmıyor).
+
+İlk çalıştırmada veritabanı boş olur, örnek skin verilerini yüklemek için:
+
+```bash
+docker compose exec backend npm run seed
+```
+
+### 3. Production ortamı (optimize build)
+
+```bash
+docker compose -f docker-compose.prod.yml up --build -d
+```
+
+- Uygulama: http://localhost (Nginx, port 80 — `NGINX_PORT` ile değiştirilebilir)
+- Backend/MongoDB dışarıya açık değildir, sadece Nginx üzerinden erişilir (güvenlik)
+- Backend derlenmiş JS (`tsc` çıktısı) ile, frontend Next.js `standalone` build ile minimal image olarak çalışır
+
+Gerçek bir domain'e deploy ederken frontend build'ine `NEXT_PUBLIC_SITE_URL` build-arg'ını gerçek domain ile geçir (`docker-compose.prod.yml` → `frontend.build.args`), aksi halde `sitemap.xml`/Open Graph URL'leri `http://localhost` kullanır.
+
+> **Not:** `sitemap.xml` skin URL'leri build anında backend'e erişilemediği için (image build sırasında container'lar henüz ayakta değil) ilk build'de boş gelir; ISR (`revalidate: 3600`) sayesinde deploy sonrası ilk saat içinde arka planda otomatik güncellenir.
+
+### Loglama
+
+Backend, [Pino](https://getpino.io/) ile yapılandırılmış (structured) loglama kullanır:
+
+- **Development:** Konsola renkli, okunabilir formatta (`pino-pretty`), `debug` seviyesinde.
+- **Production:** Konsola düz JSON (`info` seviyesinde) + `backend/logs/app-*.log` dosyasına günlük rotasyonlu (`pino-roll`, 10MB veya gün değişiminde döner). Docker'da bu klasör `backend_logs` volume'una yazılır, container silinse de loglar kalır.
+- **Kapsam:** Tüm HTTP istekleri (`pino-http`, hassas header/body alanları redakte edilir), yakalanmamış hata/exception'lar, ve önemli olaylar (login/register, ban/rol değişikliği, para yatırma/çekme, satın alma, ilan kaldırma) `event` alanıyla etiketlenmiş halde loglanır.
+- `LOG_LEVEL` (`trace|debug|info|warn|error|fatal`) ve `LOG_TO_FILE` (`true`/`false`) ile davranış override edilebilir (bkz. `backend/.env.example`).
+
+```bash
+docker compose logs -f backend       # canlı log takibi (dev/prod)
+docker compose exec backend tail -f logs/app.log   # prod'da dosyaya yazılan logu takip et
+```
+
+### Rate Limiting
+
+`express-rate-limit`, `REDIS_URL` tanımlıysa (Docker Compose'da otomatik) Redis store kullanır; bu sayede birden fazla backend instance'ı rate limit sayaçlarını paylaşır (dağıtık ortam için gereklidir). `REDIS_URL` tanımlı değilse (örn. Redis'siz lokal geliştirme) otomatik olarak in-memory store'a düşer, herhangi bir hata vermez.
+
+### Durdurma / temizleme
+
+```bash
+docker compose down            # dev ortamı durdur (mongo_data volume kalır)
+docker compose down -v         # + veritabanı volume'unu da sil
+```
+
+## CI/CD
+
+`.github/workflows/ci.yml`, her pull request'te ve `main` branch'ine her push'ta backend ve frontend'i ayrı işler (job) olarak doğrular:
+
+- **Backend:** `npm install` → `tsc --noEmit` (typecheck) → `npm run build`
+- **Frontend:** `npm install` → `next lint` (sadece raporlar, pipeline'ı kırmaz — bkz. not) → `tsc --noEmit` → `npm run build`
+
+> **Not:** Projede önceden var olan çok sayıda `no-explicit-any` lint uyarısı var (bkz. `frontend/next.config.js` → `eslint.ignoreDuringBuilds: true`); bu tutarlılıkla CI'daki lint adımı da sonucu raporlar ama pipeline'ı başarısız yapmaz.
+
+Henüz bir deploy hedefi (Vercel/Railway/Render vb.) yapılandırılmadığı için pipeline şu an sadece CI (build doğrulaması) yapıyor; "Production Deploy" roadmap maddesi tamamlandığında CD (otomatik deploy) adımları eklenebilir.
+
+## Proje Yapısı
+
+```
+Zade/
+├── backend/
+│   ├── src/
+│   │   ├── config.ts          # Merkezi konfigürasyon
+│   │   ├── index.ts           # Express app + rate limiting
+│   │   ├── logger.ts          # Pino logger (console + günlük rotasyonlu dosya)
+│   │   ├── swagger.ts         # OpenAPI spec (swagger-jsdoc, route dosyalarındaki @swagger yorumlarından üretilir)
+│   │   ├── lib/redis.ts       # Redis client (REDIS_URL yoksa null → in-memory fallback)
+│   │   ├── middleware/requestLogger.ts # pino-http HTTP istek loglama
+│   │   ├── models/User.ts     # Mongoose User modeli (balance dahil)
+│   │   ├── models/Transaction.ts # Cüzdan işlem kayıtları (deposit/withdrawal/purchase/sale)
+│   │   ├── services/iyzico.ts # iyzico Checkout Form entegrasyonu
+│   │   └── routes/
+│   │       ├── users.ts       # Auth + CRUD + email doğrulama
+│   │       ├── skins.ts       # Skin verileri + arama
+│   │       ├── wallet.ts      # Bakiye, para yatırma/çekme, işlem geçmişi
+│   │       ├── notifications.ts # Bildirim listesi, okunmamış sayacı, okundu işaretleme
+│   │       ├── admin.ts       # Admin: stats, kullanıcı ban/rol, ilan moderasyonu
+│   │       └── steam.ts       # Steam profil/envanter
+│   └── .env
+├── frontend/
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── page.tsx       # Ana sayfa
+│   │   │   ├── login/         # Giriş sayfası
+│   │   │   ├── register/      # Kayıt sayfası
+│   │   │   ├── market/        # Marketplace (filtre + sıralama)
+│   │   │   ├── sell/           # Satış sayfası
+│   │   │   ├── wallet/         # Cüzdan (bakiye, para yatırma/çekme, işlem geçmişi)
+│   │   │   ├── profile/       # Kullanıcı profili
+│   │   │   ├── admin/         # Admin paneli (kullanıcı/ilan yönetimi, istatistikler)
+│   │   │   └── cs2/skins/     # Skin kategorileri/detay
+│   │   ├── components/
+│   │   │   ├── Navbar.tsx     # Arama + auth durumu
+│   │   │   └── skins/         # SkinCard
+│   │   └── lib/
+│   │       ├── api.ts         # API client
+│   │       ├── auth.tsx       # AuthContext + useAuth
+│   │       ├── data.ts        # Statik skin verileri
+│   │       └── types.ts       # TypeScript tipleri
+│   └── public/images/         # Skin görselleri
+├── nginx/
+│   ├── nginx.dev.conf          # Dev reverse proxy (HMR websocket destekli)
+│   └── nginx.prod.conf         # Prod reverse proxy (gzip)
+├── .github/workflows/ci.yml    # CI: backend+frontend lint/typecheck/build doğrulaması
+├── docker-compose.yml          # Dev ortamı (hot-reload)
+├── docker-compose.prod.yml     # Prod ortamı (optimize build)
+└── README.md
+```
+
+## Özellikler
+
+- 🔐 JWT tabanlı kimlik doğrulama (register, login, token)
+- 🔍 Skin arama (debounced, dropdown sonuçlar)
+- 🛡️ Rate limiting (genel: 100/15dk, auth: 10/15dk)
+- 🎨 Dark/Light mode
+- 📱 Responsive tasarım
+- 🎯 Input validation (email, şifre, username)
+- 📧 Email doğrulama + şifre sıfırlama
+- 💰 Steam Market fiyat entegrasyonu
+- 👛 Cüzdan / bakiye sistemi (iyzico ile para yatırma, bakiyeyle satın alma)
+- 🔔 Bildirim sistemi (satış/alım, para yatırma/çekme, değerlendirme — in-app + kritik email)
+- 📈 Fiyat geçmişi grafikleri (platform satışları + Steam anlık fiyat referansı, Chart.js)
+- 🔎 SEO: sayfa bazlı meta/OG etiketleri, dinamik `sitemap.xml`, `robots.txt`, Product JSON-LD, hreflang alternates
+- 🛠️ Admin Paneli: kullanıcı yönetimi (ban/ban kaldırma, rol değiştirme), ilan moderasyonu, platform istatistikleri dashboard'u
+- 🌐 Çoklu dil (i18n): Türkçe / İngilizce (`next-intl`, `/tr/...` ve `/en/...` locale önekli route'lar, Navbar dil değiştirici)
+- 🐳 Docker Compose: dev (hot-reload) + prod (optimize build) ortamları, MongoDB + Redis container'ları, Nginx reverse proxy
+- 📝 Yapılandırılmış loglama (Pino): console + günlük rotasyonlu dosya, HTTP istek logları, önemli olay logları (login, ödeme, admin işlemleri)
+- 🚦 Redis destekli dağıtık rate limiting (Redis yoksa otomatik in-memory fallback)
+- 📖 API Dokümantasyonu (Swagger/OpenAPI, admin panelinde interaktif SwaggerUI, sadece admin erişimi)
+- ⚙️ CI Pipeline (GitHub Actions — her PR/push'ta backend+frontend lint/typecheck/build doğrulaması)
+
+---
+
+## 📋 Yapılacaklar (TODO / Roadmap)
+
+### ✅ Tamamlanan İşler
+
+- [x] Backend API kurulumu (Express + TypeScript + MongoDB)
+- [x] JWT tabanlı auth sistemi (register, login, token)
+- [x] Frontend auth sayfaları (`/login`, `/register`, `/forgot-password`)
+- [x] `AuthContext` + `useAuth` hook (token yönetimi, localStorage)
+- [x] API client (`lib/api.ts`) — merkezi endpoint yönetimi
+- [x] Navbar'da debounced arama + dropdown sonuçlar
+- [x] Rate limiting (genel: 100/15dk, auth: 10/15dk)
+- [x] Helmet + mongo-sanitize güvenlik middleware'leri
+- [x] Steam Market fiyat entegrasyonu
+- [x] Steam profil/envanter endpoint'leri
+- [x] Email doğrulama + şifre sıfırlama backend akışı
+- [x] CS2 skin kategori/silah/detay sayfaları (`/cs2/skins/...`)
+- [x] Market sayfası (`/market`) — filtre + sıralama + skin listeleme
+- [x] Satış sayfası (`/sell`) — ürün satışa koyma formu
+- [x] Profil sayfası (`/profile`) — kullanıcı bilgileri
+- [x] `/cs2-skin` eski route → `/cs2/skins` redirect'i
+- [x] Gereksiz dosya/klasör temizliği
+- [x] README.md güncelleme
+- [x] MongoDB Skin modeli + Listing modeli oluşturuldu
+- [x] Seed script ile 51 skin veritabanına yüklendi
+- [x] Market sayfası backend API'den veri çekiyor (server-side filtre + sıralama + pagination)
+- [x] Satış sayfası backend'e bağlandı (skin arama autocomplete + ilan oluşturma)
+- [x] Listings API — CRUD endpoint'leri (`/api/listings`)
+- [x] `.env` / `config.ts` env var uyuşmazlığı düzeltildi
+- [x] MongoDB auth devre dışı bırakıldı, servis `--auth` olmadan yeniden kaydedildi
+
+---
+
+### 🔴 Yüksek Öncelik
+
+- [x] **Veritabanı Skin Modeli** — MongoDB Skin modeli + seed script tamamlandı (51 skin)
+- [x] **Market Sayfası Backend Entegrasyonu** — Market sayfası backend API'den veri çekiyor (filtre + sıralama + pagination)
+- [x] **Satış Sayfası Backend Entegrasyonu** — Sell formu backend'e POST `/api/listings` ile bağlandı (skin arama + ilan oluşturma)
+- [x] **Ödeme / Bakiye Sistemi** — iyzico Checkout Form (sandbox) ile para yatırma, cüzdan bakiyesiyle satın alma, para çekme talebi *(tamamlandı)*
+- [x] **Sipariş / İşlem (Transaction) Sistemi** — Deposit/withdrawal/purchase/sale işlem geçmişi (`Transaction` modeli + `/api/wallet/transactions`) *(tamamlandı)*
+- [x] **Next.js 15 `params` TypeScript Hatası** — Tüm dynamic route sayfalarında `Promise` + `use()` ile düzeltildi
+
+---
+
+### 🟡 Orta Öncelik
+
+- [x] **Profil Sayfası Backend Entegrasyonu** — Profil düzenleme, Steam hesap bağlama, istatistikler, favoriler tabı *(tamamlandı)*
+- [x] **Steam Envanter ile Satış Bağlantısı** — Sell sayfasında Steam envanterinden skin seçme *(tamamlandı)*
+- [ ] **Trade Offer Sistemi** — Steam Trade API ile otomatik takas *(ertelendi — Steam OAuth gerekir)*
+- [x] **Bildirim Sistemi** — Satış/alım, para yatırma/çekme, değerlendirme bildirimleri (in-app polling + kritik olaylarda email) *(tamamlandı)*
+- [x] **Admin Paneli** — Kullanıcı yönetimi (ban/ban kaldırma, rol değiştirme), ilan moderasyonu (kaldırma), platform istatistikleri dashboard'u (`/admin`, `ADMIN_EMAILS` ile rol ataması) *(tamamlandı)*
+- [x] **Kullanıcı Değerlendirme Sistemi** — Alıcı/satıcı puanlama ve yorum (Review modeli + API) *(tamamlandı)*
+- [x] **Favoriler / Watchlist** — Skin favorilere ekleme/çıkarma + profilde Favoriler tabı *(tamamlandı)*
+
+---
+
+### 🟢 Düşük Öncelik / İyileştirmeler
+
+- [x] **Daha Fazla Skin Verisi** — Seed script ile 51 skin (AWP, AK-47, M4A4) veritabanına yüklendi
+- [x] **Gelişmiş Filtreleme** — Wear (FN/MW/FT/WW/BS), StatTrak™, float değeri filtresi (ilan bazlı) *(tamamlandı)*
+- [x] **Fiyat Geçmişi Grafikleri** — Platform satış geçmişi (günlük ortalama/min/max) + Steam anlık fiyat referansı, Chart.js ile görselleştirme *(tamamlandı)*
+- [x] **Çoklu Dil Desteği (i18n)** — `next-intl` ile Türkçe/İngilizce, locale önekli route'lar (`/tr/...`, `/en/...`), Navbar dil değiştirici, hreflang sitemap *(tamamlandı)*
+- [x] **SEO Optimizasyonu** — Sayfa bazlı meta etiketleri, Open Graph/Twitter kartları, `sitemap.xml` (backend'den dinamik skin rotaları), `robots.txt`, skin detay sayfalarında Product JSON-LD *(tamamlandı)*
+- [ ] **PWA Desteği** — Offline erişim, push bildirimler
+- [ ] **E2E Testler** — Cypress/Playwright ile uçtan uca testler
+- [x] **CI/CD Pipeline** — GitHub Actions ile her PR/push'ta backend+frontend lint/typecheck/build doğrulaması (`.github/workflows/ci.yml`); deploy hedefi belirlenince CD adımları eklenecek *(CI tamamlandı, CD roadmap'te ayrı madde)*
+- [x] **Docker Compose** — Dev (hot-reload) ve prod (optimize build) ortamları, MongoDB container + volume, Nginx reverse proxy (`/api` → backend, `/` → frontend) *(tamamlandı)*
+- [x] **Rate Limiting İyileştirmesi** — `REDIS_URL` tanımlıysa Redis store (dağıtık ortam), tanımsızsa otomatik in-memory fallback *(tamamlandı)*
+- [x] **Logging** — Pino ile merkezi loglama: console (dev) + günlük rotasyonlu dosya (prod), HTTP istek logları, hata/exception logları, önemli olay logları (login, ödeme, admin işlemleri) *(tamamlandı)*
+- [x] **API Dokümantasyonu** — Swagger/OpenAPI (`swagger-jsdoc`) ile tüm endpoint'ler (~55) belgelendi; admin panelinde "API Dokümantasyonu" sekmesinde SwaggerUI ile interaktif olarak görüntülenir (sadece admin, JWT ile korumalı) *(tamamlandı)*
+
+---
+
+### 🏗️ Altyapı / DevOps
+
+- [ ] **Production Deploy** — Vercel (frontend) + Railway/Render (backend) + MongoDB Atlas
+- [ ] **Domain + SSL** — Özel domain bağlama
+- [ ] **CDN** — Skin görselleri için Cloudflare/S3 + CloudFront
+- [ ] **Monitoring** — Uptime monitoring + hata takibi (Sentry)

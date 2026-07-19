@@ -1,0 +1,13 @@
+node_modules
+dist
+logs
+npm-debug.log*
+.env
+.env.*
+*.md
+tsc_*.txt
+seed_output.txt
+seed2.txt
+mongo_check.txt
+.git
+.gitignore

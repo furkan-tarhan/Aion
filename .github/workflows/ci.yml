@@ -1,0 +1,72 @@
+name: CI
+
+# Deploy hedefi henüz yapılandırılmadığı için bu pipeline sadece CI (lint + typecheck + build
+# doğrulaması) yapar; "Production Deploy" roadmap maddesi tamamlandığında CD adımları eklenebilir.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (lint + typecheck + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      # package-lock.json Windows'ta üretildiği için bazı native/opsiyonel bağımlılıklar kilit
+      # dosyasında eksik olabilir; `npm ci` bu durumda başarısız olur (bkz. backend/Dockerfile notu).
+      - name: Install dependencies
+        run: npm install
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+  frontend:
+    name: Frontend (lint + typecheck + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      # Aynı sebeple (Windows lock dosyası, Linux'a özel SWC/Next.js opsiyonel bağımlılıkları)
+      # `npm ci` yerine `npm install` kullanılıyor.
+      - name: Install dependencies
+        run: npm install
+
+      # Proje genelinde önceden var olan `no-explicit-any` uyarıları next.config.js'te de
+      # (`eslint.ignoreDuringBuilds: true`) kasıtlı olarak build'i bloklamıyor; CI'da da aynı
+      # tutarlılıkla lint sonucu raporlanır ama pipeline'ı kırmaz.
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        # Backend CI'da ayakta olmadığı için build sırasındaki server-side fetch'ler
+        # (sitemap.ts, generateMetadata) zaman aşımına uğrar ama zaten try/catch ile boş veri
+        # dönerek build'i bozmaz (bkz. frontend/src/lib/seo.ts).
+        run: npm run build
