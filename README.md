@@ -135,6 +135,14 @@ docker compose exec backend tail -f logs/app.log   # prod'da dosyaya yazılan lo
 
 `express-rate-limit`, `REDIS_URL` tanımlıysa (Docker Compose'da otomatik) Redis store kullanır; bu sayede birden fazla backend instance'ı rate limit sayaçlarını paylaşır (dağıtık ortam için gereklidir). `REDIS_URL` tanımlı değilse (örn. Redis'siz lokal geliştirme) otomatik olarak in-memory store'a düşer, herhangi bir hata vermez.
 
+### Monitoring
+
+- **Hata takibi ([Sentry](https://sentry.io)):** Backend (`@sentry/node`) ve frontend (`@sentry/nextjs`) için ayrı ayrı entegre edilmiştir. `SENTRY_DSN` (backend + frontend server/edge) ve `NEXT_PUBLIC_SENTRY_DSN` (frontend client) tanımlı değilse Sentry sessizce devre dışı kalır — hesap açmadan da proje sorunsuz çalışır (bkz. `.env.example` dosyaları).
+  - Backend: `backend/src/instrument.ts` (index.ts'te ilk import), yakalanmamış hata/exception'lar ve Express route hataları otomatik gönderilir.
+  - Frontend: `frontend/src/instrumentation.ts` + `instrumentation-client.ts` + `sentry.server.config.ts` + `sentry.edge.config.ts` (SSR, client, middleware hatalarını kapsar).
+  - Source map yükleme (okunabilir stack trace) opsiyoneldir; `SENTRY_ORG`/`SENTRY_PROJECT`/`SENTRY_AUTH_TOKEN` tanımlı değilse build'i bloklamadan otomatik atlanır.
+- **Uptime monitoring:** `GET /api/health` — MongoDB bağlantı durumunu ve process uptime'ını döner (`{"success":true,"status":"ok","mongo":true,"uptime":123.45}`, bağlantı yoksa `503`). UptimeRobot/Better Stack gibi bir servisle bu endpoint periyodik olarak izlenebilir.
+
 ### Durdurma / temizleme
 
 ```bash
@@ -151,7 +159,39 @@ docker compose down -v         # + veritabanı volume'unu da sil
 
 > **Not:** Projede önceden var olan çok sayıda `no-explicit-any` lint uyarısı var (bkz. `frontend/next.config.js` → `eslint.ignoreDuringBuilds: true`); bu tutarlılıkla CI'daki lint adımı da sonucu raporlar ama pipeline'ı başarısız yapmaz.
 
-Henüz bir deploy hedefi (Vercel/Railway/Render vb.) yapılandırılmadığı için pipeline şu an sadece CI (build doğrulaması) yapıyor; "Production Deploy" roadmap maddesi tamamlandığında CD (otomatik deploy) adımları eklenebilir.
+Pipeline şu an CI (build doğrulaması + E2E) yapıyor. Production hosting Vercel + Railway + Atlas ile yapılandırıldı; adım adım kurulum için [docs/DEPLOY.md](docs/DEPLOY.md) bak. GitHub'a push sonrası platformların kendi Git deploy'u yeterlidir; ayrı CD job'u opsiyonel.
+
+## Production Deploy
+
+| Katman | Servis | Repo config |
+|--------|--------|-------------|
+| Frontend | Vercel | `frontend/vercel.json` (Root Directory: `frontend`) |
+| Backend | Railway | `backend/railway.toml` (Root Directory: `backend`) |
+| DB | MongoDB Atlas (M0) | `MONGODB_URI=mongodb+srv://...` |
+
+Lokal `mongodb://localhost:...` cloud'da çalışmaz — Atlas zorunlu. Detaylı checklist, env listesi ve sorun giderme: **[docs/DEPLOY.md](docs/DEPLOY.md)**.
+
+### CDN (skin görselleri)
+
+`NEXT_PUBLIC_CDN_URL` (örn. Cloudflare R2 custom domain) tanımlıysa `/images/...` path'leri CDN'e gider; boşsa `public/` kullanılır. Yükleme: `cd frontend && npm run sync:cdn` — rehber: **[docs/CDN.md](docs/CDN.md)**.
+
+### E2E Testler (Playwright)
+
+Frontend'de Playwright ile core smoke/auth akışları test edilir (`frontend/e2e/`). API çağrıları `page.route` ile mock'lanır — gerçek backend/MongoDB gerekmez.
+
+```bash
+cd frontend
+npm run test:e2e        # headless
+npm run test:e2e:ui     # Playwright UI mode
+```
+
+Kapsam: ana sayfa, login/register formları, market açılışı, korumalı profil/sat sayfaları (giriş zorunluluğu + mock JWT ile giriş sonrası görünüm). CI'da `e2e` job'u frontend build'inden sonra Chromium ile çalışır.
+
+### PWA (Progressive Web App)
+
+- **Kurulum / offline:** Production build'de Serwist service worker (`/sw.js`) üretilir; App Manifest (`/manifest.webmanifest`) ve ikonlar ile "Ana ekrana ekle" desteklenir. Ağ yokken document istekleri `/tr/offline` (veya `/en/offline`) fallback'ine düşer.
+- **Web Push:** Backend'de `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` tanımlıysa kullanıcı abone olabilir (`PushPrompt` banner'ı). `createNotification` çağrıları aynı anda tarayıcı push gönderir. Anahtar üretmek: `cd backend && npx web-push generate-vapid-keys`
+- **Not:** Service worker development (`next dev` / Turbopack) ortamında kapalıdır; PWA'yı denemek için `npm run build && npm run start` kullan.
 
 ## Proje Yapısı
 
@@ -200,9 +240,11 @@ Zade/
 ├── nginx/
 │   ├── nginx.dev.conf          # Dev reverse proxy (HMR websocket destekli)
 │   └── nginx.prod.conf         # Prod reverse proxy (gzip)
-├── .github/workflows/ci.yml    # CI: backend+frontend lint/typecheck/build doğrulaması
+├── .github/workflows/ci.yml    # CI: backend+frontend lint/typecheck/build + Playwright E2E
 ├── docker-compose.yml          # Dev ortamı (hot-reload)
 ├── docker-compose.prod.yml     # Prod ortamı (optimize build)
+├── docs/DEPLOY.md              # Production: Atlas + Railway + Vercel adım adım
+├── docs/CDN.md                 # Skin görselleri: Cloudflare R2 / S3 CDN
 └── README.md
 ```
 
@@ -227,6 +269,11 @@ Zade/
 - 🚦 Redis destekli dağıtık rate limiting (Redis yoksa otomatik in-memory fallback)
 - 📖 API Dokümantasyonu (Swagger/OpenAPI, admin panelinde interaktif SwaggerUI, sadece admin erişimi)
 - ⚙️ CI Pipeline (GitHub Actions — her PR/push'ta backend+frontend lint/typecheck/build doğrulaması)
+- 🩺 Monitoring: Sentry hata takibi (backend + frontend, opsiyonel) + `/api/health` uptime endpoint'i
+- 🧪 E2E Testler (Playwright): smoke + auth + korumalı sayfalar, CI'da otomatik
+- 📱 PWA: installable (manifest + ikonlar), offline fallback (Serwist), Web Push bildirimleri
+- 🚀 Production deploy: Vercel + Railway + MongoDB Atlas (`docs/DEPLOY.md`)
+- 🖼️ CDN: Cloudflare R2 / S3 uyumlu (`NEXT_PUBLIC_CDN_URL`, `docs/CDN.md`)
 
 ---
 
@@ -292,8 +339,8 @@ Zade/
 - [x] **Fiyat Geçmişi Grafikleri** — Platform satış geçmişi (günlük ortalama/min/max) + Steam anlık fiyat referansı, Chart.js ile görselleştirme *(tamamlandı)*
 - [x] **Çoklu Dil Desteği (i18n)** — `next-intl` ile Türkçe/İngilizce, locale önekli route'lar (`/tr/...`, `/en/...`), Navbar dil değiştirici, hreflang sitemap *(tamamlandı)*
 - [x] **SEO Optimizasyonu** — Sayfa bazlı meta etiketleri, Open Graph/Twitter kartları, `sitemap.xml` (backend'den dinamik skin rotaları), `robots.txt`, skin detay sayfalarında Product JSON-LD *(tamamlandı)*
-- [ ] **PWA Desteği** — Offline erişim, push bildirimler
-- [ ] **E2E Testler** — Cypress/Playwright ile uçtan uca testler
+- [x] **PWA Desteği** — Serwist service worker + offline sayfa, Web App Manifest, Web Push (VAPID) abonelik + kritik bildirimlerde tarayıcı push *(tamamlandı)*
+- [x] **E2E Testler** — Playwright ile core smoke/auth/profil/sat akışları (`frontend/e2e/`); API mock'lu, CI'da Chromium job'u *(tamamlandı)*
 - [x] **CI/CD Pipeline** — GitHub Actions ile her PR/push'ta backend+frontend lint/typecheck/build doğrulaması (`.github/workflows/ci.yml`); deploy hedefi belirlenince CD adımları eklenecek *(CI tamamlandı, CD roadmap'te ayrı madde)*
 - [x] **Docker Compose** — Dev (hot-reload) ve prod (optimize build) ortamları, MongoDB container + volume, Nginx reverse proxy (`/api` → backend, `/` → frontend) *(tamamlandı)*
 - [x] **Rate Limiting İyileştirmesi** — `REDIS_URL` tanımlıysa Redis store (dağıtık ortam), tanımsızsa otomatik in-memory fallback *(tamamlandı)*
@@ -304,7 +351,7 @@ Zade/
 
 ### 🏗️ Altyapı / DevOps
 
-- [ ] **Production Deploy** — Vercel (frontend) + Railway/Render (backend) + MongoDB Atlas
+- [x] **Production Deploy** — Vercel (frontend) + Railway (backend) + MongoDB Atlas; `docs/DEPLOY.md` rehberi, `railway.toml` / `vercel.json`, trust proxy + çoklu CORS *(config + rehber tamam; canlı hesap bağlama senin adımların)*
 - [ ] **Domain + SSL** — Özel domain bağlama
-- [ ] **CDN** — Skin görselleri için Cloudflare/S3 + CloudFront
-- [ ] **Monitoring** — Uptime monitoring + hata takibi (Sentry)
+- [x] **CDN** — `NEXT_PUBLIC_CDN_URL` + `cdnUrl()` ile skin görselleri; Cloudflare R2 sync script (`npm run sync:cdn`); rehber `docs/CDN.md` *(kod tamam; bucket yükleme senin adımın)*
+- [x] **Monitoring** — Sentry ile backend + frontend hata takibi (`SENTRY_DSN`/`NEXT_PUBLIC_SENTRY_DSN` tanımlı değilse devre dışı), `/api/health` endpoint'i ile uptime monitoring *(tamamlandı)*

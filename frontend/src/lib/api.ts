@@ -212,6 +212,21 @@ export const notificationsApi = {
         request<{ success: boolean; message: string }>('/api/notifications/read-all', {
             method: 'PATCH',
         }),
+
+    getVapidPublicKey: () =>
+        request<{ success: boolean; data: { publicKey: string | null } }>('/api/notifications/push/vapid-public-key'),
+
+    subscribePush: (subscription: PushSubscriptionJSON) =>
+        request<{ success: boolean; message: string }>('/api/notifications/push/subscribe', {
+            method: 'POST',
+            body: JSON.stringify({ subscription }),
+        }),
+
+    unsubscribePush: (endpoint: string) =>
+        request<{ success: boolean; message: string }>('/api/notifications/push/unsubscribe', {
+            method: 'POST',
+            body: JSON.stringify({ endpoint }),
+        }),
 };
 
 // Admin API

@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import Navbar from '@/components/Navbar';
 import { Link } from '@/i18n/navigation';
 import { skinsApi } from '@/lib/api';
+import { cdnUrl } from '@/lib/cdn';
 
 const weaponCategories = [
   {
@@ -208,7 +209,7 @@ export default function HomeClient() {
                   <div className="aspect-video bg-gray-100 dark:bg-blue-800 rounded-lg mb-4 overflow-hidden relative">
                     {skin.image && (
                       <img
-                        src={skin.image}
+                        src={cdnUrl(skin.image)}
                         alt={`${skin.weapon} | ${skin.name}`}
                         className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                       />

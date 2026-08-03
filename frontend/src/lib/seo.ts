@@ -1,4 +1,5 @@
 import { routing } from '@/i18n/routing';
+import { cdnUrl, isCdnAssetPath } from '@/lib/cdn';
 
 // Bu dosya sadece server component'lerde (generateMetadata, sitemap.ts) çalışır.
 // Docker/Nginx arkasında NEXT_PUBLIC_API_URL browser için relative ("") olabileceğinden,
@@ -11,7 +12,13 @@ export const SITE_NAME = 'Zade';
 export function absoluteUrl(path: string): string {
   if (!path) return SITE_URL;
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
-  return `${SITE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  // Skin/OG görselleri CDN'deyse mutlak CDN URL kullan (Open Graph crawler'ları için).
+  if (isCdnAssetPath(normalized)) {
+    const viaCdn = cdnUrl(normalized);
+    if (viaCdn.startsWith('http://') || viaCdn.startsWith('https://')) return viaCdn;
+  }
+  return `${SITE_URL}${normalized}`;
 }
 
 // Verilen locale önekisiz path için tüm desteklenen dillere ait mutlak URL'leri üretir.

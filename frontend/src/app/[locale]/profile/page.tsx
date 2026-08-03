@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/lib/auth';
 import { userApi, listingsApi, favoritesApi, skinsApi, walletApi } from '@/lib/api';
+import { cdnUrl } from '@/lib/cdn';
 import { Link } from '@/i18n/navigation';
 
 export default function ProfilePage() {
@@ -373,7 +374,7 @@ export default function ProfilePage() {
                                             {favoriteSkins.map((skin: any) => (
                                                 <div key={skin.id} className="bg-gray-50 dark:bg-blue-800/50 rounded-xl p-4 flex items-center gap-4">
                                                     {skin.image && (
-                                                        <img src={skin.image} alt={skin.name} className="w-16 h-16 object-contain" />
+                                                        <img src={cdnUrl(skin.image)} alt={skin.name} className="w-16 h-16 object-contain" />
                                                     )}
                                                     <div className="flex-1">
                                                         <p className="font-semibold text-sm">{skin.weapon} | {skin.name}</p>

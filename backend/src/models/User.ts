@@ -28,6 +28,12 @@ export interface IUser extends Document {
   isBanned: boolean;
   bannedAt?: Date;
   banReason?: string;
+  // Web Push abonelikleri (PWA). endpoint unique; aynı cihaz yeniden abone olunca güncellenir.
+  pushSubscriptions: {
+    endpoint: string;
+    keys: { p256dh: string; auth: string };
+    createdAt?: Date;
+  }[];
 }
 
 const UserSchema: Schema = new Schema({
@@ -57,7 +63,15 @@ const UserSchema: Schema = new Schema({
   role: { type: String, enum: ['user', 'admin'], default: 'user', index: true },
   isBanned: { type: Boolean, default: false, index: true },
   bannedAt: Date,
-  banReason: String
+  banReason: String,
+  pushSubscriptions: [{
+    endpoint: { type: String, required: true },
+    keys: {
+      p256dh: { type: String, required: true },
+      auth: { type: String, required: true },
+    },
+    createdAt: { type: Date, default: Date.now },
+  }],
 });
 
 export default mongoose.model<IUser>('User', UserSchema); 

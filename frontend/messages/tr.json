@@ -18,6 +18,18 @@
     "noResults": "Sonuç bulunamadı",
     "priceLoading": "Fiyat yükleniyor..."
   },
+  "offline": {
+    "title": "Çevrimdışısınız",
+    "description": "İnternet bağlantınız yok. Bağlantı geldiğinde tekrar deneyin; önbelleğe alınan sayfalar yine de açılabilir.",
+    "retry": "Ana sayfaya dön"
+  },
+  "push": {
+    "title": "Bildirimleri aç",
+    "description": "Satış, para yatırma ve önemli hesap olaylarında tarayıcı bildirimi alın.",
+    "enable": "Aç",
+    "later": "Sonra",
+    "enabling": "Açılıyor..."
+  },
   "navbar": {
     "home": "Ana Sayfa",
     "cs2Skin": "CS2 Skin",

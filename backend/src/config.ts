@@ -22,9 +22,12 @@ export const config = {
     backendUrl: process.env.BACKEND_URL || 'http://localhost:5000',
   },
 
-  // CORS Configuration
+  // CORS — virgülle birden fazla origin (Vercel production + preview URL'leri için)
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3001',
+    origin: (process.env.CORS_ORIGIN || 'http://localhost:3000')
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean),
   },
 
   // Frontend URL (redirect'ler için)

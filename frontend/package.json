@@ -6,10 +6,15 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "sync:cdn": "node scripts/sync-cdn.mjs"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",
+    "@sentry/nextjs": "^10.66.0",
+    "@serwist/next": "^9.5.11",
     "chart.js": "^4.5.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -23,7 +28,9 @@
     "tailwind-merge": "^3.3.0"
   },
   "devDependencies": {
+    "@aws-sdk/client-s3": "^3.1090.0",
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.61.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -31,6 +38,8 @@
     "eslint": "^9",
     "eslint-config-next": "15.1.8",
     "postcss": "^8",
+    "serwist": "^9.5.11",
+    "sharp": "^0.35.3",
     "tailwindcss": "^3.4.1",
     "typescript": "^5"
   }

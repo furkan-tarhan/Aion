@@ -9,6 +9,7 @@ import Navbar from '@/components/Navbar';
 import RarityBadge from '@/components/ui/RarityBadge';
 import PriceDisplay from '@/components/ui/PriceDisplay';
 import { skinsApi } from '@/lib/api';
+import { cdnUrl } from '@/lib/cdn';
 import PriceHistoryChart, { PriceHistoryPoint } from '@/components/PriceHistoryChart';
 
 interface SkinDetail {
@@ -173,7 +174,7 @@ export default function SkinDetailClient({
             <div className="bg-white/90 dark:bg-blue-900/80 backdrop-blur-sm rounded-xl shadow-lg p-8">
               <div className="aspect-square bg-gray-100 dark:bg-blue-800 rounded-lg overflow-hidden mb-6">
                 <img
-                  src={skin.image}
+                  src={cdnUrl(skin.image)}
                   alt={skin.name}
                   className="w-full h-full object-contain"
                 />

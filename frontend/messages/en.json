@@ -18,6 +18,18 @@
     "noResults": "No results found",
     "priceLoading": "Loading price..."
   },
+  "offline": {
+    "title": "You're offline",
+    "description": "No internet connection. Try again when you're back online — cached pages may still work.",
+    "retry": "Back to home"
+  },
+  "push": {
+    "title": "Enable notifications",
+    "description": "Get browser alerts for sales, deposits, and important account events.",
+    "enable": "Enable",
+    "later": "Later",
+    "enabling": "Enabling..."
+  },
   "navbar": {
     "home": "Home",
     "cs2Skin": "CS2 Skins",

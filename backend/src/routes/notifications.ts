@@ -1,6 +1,8 @@
 import express, { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import Notification from '../models/Notification';
+import User from '../models/User';
+import { getVapidPublicKey, isWebPushConfigured } from '../services/webPush';
 
 const router = express.Router();
 const JWT_SECRET: string = process.env.JWT_SECRET ?? (() => { throw new Error('JWT_SECRET environment variable is required'); })();
@@ -101,6 +103,105 @@ router.get('/unread-count', authenticateToken, async (req: Request, res: Respons
     res.json({ success: true, data: { count } });
   } catch (error) {
     console.error('Unread count error:', error);
+    res.status(500).json({ success: false, message: 'Sunucu hatası' });
+  }
+});
+
+/**
+ * @swagger
+ * /notifications/push/vapid-public-key:
+ *   get:
+ *     summary: Web Push VAPID public key (frontend subscribe için)
+ *     tags: [Notifications]
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Public key veya null (VAPID yapılandırılmamış)
+ */
+router.get('/push/vapid-public-key', (_req: Request, res: Response) => {
+  res.json({ success: true, data: { publicKey: getVapidPublicKey() } });
+});
+
+/**
+ * @swagger
+ * /notifications/push/subscribe:
+ *   post:
+ *     summary: Web Push aboneliğini kaydet
+ *     tags: [Notifications]
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [subscription]
+ *             properties:
+ *               subscription:
+ *                 type: object
+ *                 properties:
+ *                   endpoint: { type: string }
+ *                   keys: { type: object, properties: { p256dh: { type: string }, auth: { type: string } } }
+ *     responses:
+ *       200: { description: Abonelik kaydedildi }
+ *       503: { description: VAPID yapılandırılmamış }
+ */
+router.post('/push/subscribe', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    if (!isWebPushConfigured) {
+      return res.status(503).json({ success: false, message: 'Web Push yapılandırılmamış (VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY)' });
+    }
+
+    const userId = (req as any).user.userId;
+    const sub = req.body?.subscription;
+    if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) {
+      return res.status(400).json({ success: false, message: 'Geçersiz subscription' });
+    }
+
+    // Aynı endpoint varsa önce kaldır, sonra ekle (yeniden abone olma / key rotasyonu)
+    await User.updateOne(
+      { _id: userId },
+      { $pull: { pushSubscriptions: { endpoint: sub.endpoint } } }
+    );
+    await User.updateOne(
+      { _id: userId },
+      {
+        $push: {
+          pushSubscriptions: {
+            endpoint: sub.endpoint,
+            keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth },
+            createdAt: new Date(),
+          },
+        },
+      }
+    );
+
+    res.json({ success: true, message: 'Push aboneliği kaydedildi' });
+  } catch (error) {
+    console.error('Push subscribe error:', error);
+    res.status(500).json({ success: false, message: 'Sunucu hatası' });
+  }
+});
+
+/**
+ * @swagger
+ * /notifications/push/unsubscribe:
+ *   post:
+ *     summary: Web Push aboneliğini kaldır
+ *     tags: [Notifications]
+ *     security: [{ bearerAuth: [] }]
+ */
+router.post('/push/unsubscribe', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.userId;
+    const endpoint = req.body?.endpoint;
+    if (!endpoint) {
+      return res.status(400).json({ success: false, message: 'endpoint gerekli' });
+    }
+    await User.updateOne({ _id: userId }, { $pull: { pushSubscriptions: { endpoint } } });
+    res.json({ success: true, message: 'Push aboneliği kaldırıldı' });
+  } catch (error) {
+    console.error('Push unsubscribe error:', error);
     res.status(500).json({ success: false, message: 'Sunucu hatası' });
   }
 });

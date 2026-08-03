@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/lib/auth';
 import { skinsApi, listingsApi, steamApi, userApi } from '@/lib/api';
+import { cdnUrl } from '@/lib/cdn';
 import { Link } from '@/i18n/navigation';
 
 const WEAR_VALUE_LABELS: Record<string, string> = {
@@ -284,7 +285,7 @@ export default function SellPage() {
                                                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
                                             >
                                                 {skin.image && (
-                                                    <img src={skin.image} alt={skin.name} className="w-10 h-10 object-contain" />
+                                                    <img src={cdnUrl(skin.image)} alt={skin.name} className="w-10 h-10 object-contain" />
                                                 )}
                                                 <div>
                                                     <p className="font-medium text-gray-900 dark:text-gray-100 text-sm">

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { Skin } from '@/lib/types';
+import { cdnUrl } from '@/lib/cdn';
 
 // API'den gelen skin tipi için genişletilmiş interface
 interface APISkin extends Omit<Skin, 'rarity' | 'price'> {
@@ -41,7 +42,7 @@ export default function SkinCard({ skin, weaponSlug, categorySlug, onClick }: Sk
       {/* Skin Görseli */}
       <div className="relative aspect-video mb-4 bg-gray-100 dark:bg-blue-800 rounded-lg overflow-hidden">
         <Image
-          src={skin.image}
+          src={cdnUrl(skin.image)}
           alt={skin.name}
           fill
           className="object-contain group-hover:scale-105 transition-transform duration-300"

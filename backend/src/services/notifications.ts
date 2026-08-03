@@ -1,5 +1,7 @@
 import nodemailer from 'nodemailer';
 import Notification, { NotificationType } from '../models/Notification';
+import { sendWebPushToUser } from './webPush';
+import { logger } from '../logger';
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -17,9 +19,12 @@ export interface CreateNotificationParams {
   relatedListing?: string;
   relatedTransaction?: string;
   relatedReview?: string;
+  /** Web push tıklanınca açılacak relative path (varsayılan: /tr) */
+  pushUrl?: string;
 }
 
 // Bildirim oluşturur. Hata durumunda ana akışı bozmamak için sadece loglar.
+// VAPID tanımlıysa aynı anda Web Push da gönderilir.
 export async function createNotification(params: CreateNotificationParams): Promise<void> {
   try {
     await Notification.create({
@@ -31,8 +36,14 @@ export async function createNotification(params: CreateNotificationParams): Prom
       relatedTransaction: params.relatedTransaction,
       relatedReview: params.relatedReview
     });
+
+    await sendWebPushToUser(params.user, {
+      title: params.title,
+      body: params.message,
+      url: params.pushUrl || '/tr',
+    });
   } catch (error) {
-    console.error('Bildirim oluşturulamadı:', error);
+    logger.error({ event: 'notification_create_failed', err: error }, 'Bildirim oluşturulamadı');
   }
 }
 
@@ -44,6 +55,6 @@ export async function sendCriticalEmail(to: string, subject: string, html: strin
     }
     await transporter.sendMail({ to, subject, html });
   } catch (error) {
-    console.error('Bildirim e-postası gönderilemedi:', error);
+    logger.error({ event: 'notification_email_failed', err: error }, 'Bildirim e-postası gönderilemedi');
   }
 }

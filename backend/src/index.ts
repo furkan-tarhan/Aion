@@ -1,3 +1,6 @@
+// Sentry init'in http/express/mongoose enstrümantasyonu için diğer tüm importlardan önce
+// çalışması gerekir (bkz. instrument.ts).
+import { Sentry } from './instrument';
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
@@ -20,6 +23,9 @@ import notificationRoutes from './routes/notifications';
 import adminRoutes from './routes/admin';
 
 const app = express();
+
+// Railway/Vercel gibi reverse proxy arkasında doğru client IP + rate-limit için gerekli.
+app.set('trust proxy', 1);
 
 app.use(helmet());          // HTTP güvenlik header'ları
 app.use(mongoSanitize());   // NoSQL injection koruması
@@ -76,6 +82,18 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 
+// Health check — uptime monitoring servisleri (UptimeRobot, Better Stack vb.) bu endpoint'i
+// periyodik olarak ping'leyip API + MongoDB bağlantısının ayakta olduğunu doğrulayabilir.
+app.get('/api/health', (req, res) => {
+  const mongoConnected = mongoose.connection.readyState === 1;
+  res.status(mongoConnected ? 200 : 503).json({
+    success: mongoConnected,
+    status: mongoConnected ? 'ok' : 'degraded',
+    mongo: mongoConnected,
+    uptime: process.uptime(),
+  });
+});
+
 // Test endpoint
 app.get('/', (req, res) => {
   res.json({ message: 'Zade API çalışıyor!' });
@@ -86,6 +104,12 @@ app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Endpoint bulunamadı' });
 });
 
+// SENTRY_DSN tanımlıysa: rota handler'larında fırlatılan hataları Sentry'ye gönderir, ardından
+// next(err) ile aşağıdaki logger tabanlı error handler'a devam eder (bkz. instrument.ts).
+if (process.env.SENTRY_DSN) {
+  Sentry.setupExpressErrorHandler(app);
+}
+
 // Global error handler — beklenmeyen hataları logla, istemciye 500 dön
 // (Express, 4 parametreli middleware'leri otomatik olarak error handler sayar)
 app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -95,10 +119,12 @@ app.use((err: Error, req: express.Request, res: express.Response, _next: express
 
 process.on('uncaughtException', (err) => {
   logger.error({ event: 'uncaught_exception', err }, 'Uncaught exception');
+  if (process.env.SENTRY_DSN) Sentry.captureException(err);
 });
 
 process.on('unhandledRejection', (reason) => {
   logger.error({ event: 'unhandled_rejection', reason }, 'Unhandled promise rejection');
+  if (process.env.SENTRY_DSN) Sentry.captureException(reason);
 });
 
 app.listen(config.server.port, () => {

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
@@ -7,6 +7,7 @@ import "../globals.css";
 import { AuthProvider } from "@/lib/auth";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
 import { routing } from "@/i18n/routing";
+import PushPrompt from "@/components/PushPrompt";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,11 +36,20 @@ export async function generateMetadata({
 
   return {
     metadataBase: new URL(SITE_URL),
+    applicationName: SITE_NAME,
     title: {
       default: title,
       template: `%s | ${SITE_NAME}`
     },
     description,
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "default",
+      title: SITE_NAME,
+    },
+    formatDetection: {
+      telephone: false,
+    },
     openGraph: {
       siteName: SITE_NAME,
       title,
@@ -54,9 +64,16 @@ export async function generateMetadata({
       title,
       description,
       images: ["/logo.png"]
-    }
+    },
+    icons: {
+      apple: "/icons/icon-192.png",
+    },
   };
 }
+
+export const viewport: Viewport = {
+  themeColor: "#2563eb",
+};
 
 export default async function RootLayout({
   children,
@@ -79,6 +96,7 @@ export default async function RootLayout({
         <NextIntlClientProvider>
           <AuthProvider>
             {children}
+            <PushPrompt />
           </AuthProvider>
         </NextIntlClientProvider>
       </body>

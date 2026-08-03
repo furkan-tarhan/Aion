@@ -6,6 +6,7 @@ import { Link } from '@/i18n/navigation';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/lib/auth';
 import { listingsApi } from '@/lib/api';
+import { cdnUrl } from '@/lib/cdn';
 
 // Nadirlik/wear'ın kendi değer etiketleri (Consumer, Factory New vb.) kapsam dışı; sabit kalır.
 const rarityValueLabels = ['Consumer', 'Industrial', 'Mil-Spec', 'Restricted', 'Classified', 'Covert', 'Contraband'];
@@ -323,7 +324,7 @@ export default function MarketClient() {
                                         <div className="aspect-video bg-gray-100 dark:bg-blue-800 overflow-hidden relative">
                                             {listing.skin?.image && (
                                                 <img
-                                                    src={listing.skin.image}
+                                                    src={cdnUrl(listing.skin.image)}
                                                     alt={listing.title}
                                                     className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300 p-4"
                                                 />
