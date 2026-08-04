@@ -82,12 +82,12 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Health check — uptime monitoring servisleri (UptimeRobot, Better Stack vb.) bu endpoint'i
-// periyodik olarak ping'leyip API + MongoDB bağlantısının ayakta olduğunu doğrulayabilir.
+// Health check — Railway liveness için her zaman 200 (process ayakta).
+// Mongo durumu body'de; deploy'u Mongo gecikmesiyle düşürmemek için 503 kullanılmaz.
 app.get('/api/health', (req, res) => {
   const mongoConnected = mongoose.connection.readyState === 1;
-  res.status(mongoConnected ? 200 : 503).json({
-    success: mongoConnected,
+  res.status(200).json({
+    success: true,
     status: mongoConnected ? 'ok' : 'degraded',
     mongo: mongoConnected,
     uptime: process.uptime(),
@@ -127,6 +127,7 @@ process.on('unhandledRejection', (reason) => {
   if (process.env.SENTRY_DSN) Sentry.captureException(reason);
 });
 
-app.listen(config.server.port, () => {
+// 0.0.0.0: Railway/Docker healthcheck container dışından erişebilsin
+app.listen(Number(config.server.port), '0.0.0.0', () => {
   logger.info({ event: 'server_started', port: config.server.port }, `Server ${config.server.port} portunda çalışıyor`);
 });
