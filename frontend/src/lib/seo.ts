@@ -73,10 +73,12 @@ export interface SeoSkinListItem {
 }
 
 // sitemap.ts için tüm skinlerin hafif listesi.
+// Build sırasında backend erişilemiyorsa (ör. Vercel build ortamı) boş döner — ISR ile sonradan güncellenir.
 export async function getAllSkinsForSitemap(): Promise<SeoSkinListItem[]> {
   try {
     const res = await fetch(`${API_BASE_URL}/api/skins?limit=1000`, {
-      next: { revalidate: 3600 }
+      next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(3000), // 3 saniye timeout — build'i bloklamaz
     });
     if (!res.ok) return [];
     const json = await res.json();
@@ -84,7 +86,7 @@ export async function getAllSkinsForSitemap(): Promise<SeoSkinListItem[]> {
     const list = Array.isArray(json.data) ? json.data : json.data?.skins;
     return Array.isArray(list) ? list : [];
   } catch (error) {
-    console.error('getAllSkinsForSitemap error:', error);
+    // Build ortamında backend yoksa sessizce boş döner; deploy sonrası ISR günceller
     return [];
   }
 }
