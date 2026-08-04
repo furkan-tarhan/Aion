@@ -5,11 +5,21 @@ import { config } from '../config';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const Iyzipay: any = require('iyzipay');
 
-const iyzipay = new Iyzipay({
-  apiKey: config.iyzico.apiKey,
-  secretKey: config.iyzico.secretKey,
-  uri: config.iyzico.baseUrl
-});
+let iyzipayInstance: any = null;
+
+function getIyzipayClient(): any {
+  if (!config.iyzico.apiKey || !config.iyzico.secretKey) {
+    throw new Error('iyzico API bilgileri (IYZICO_API_KEY / IYZICO_SECRET_KEY) henüz ortam değişkenlerinde tanımlanmamış.');
+  }
+  if (!iyzipayInstance) {
+    iyzipayInstance = new Iyzipay({
+      apiKey: config.iyzico.apiKey,
+      secretKey: config.iyzico.secretKey,
+      uri: config.iyzico.baseUrl
+    });
+  }
+  return iyzipayInstance;
+}
 
 export interface DepositBuyerInfo {
   userId: string;
@@ -92,23 +102,33 @@ export function initializeDeposit(
       ]
     };
 
-    iyzipay.checkoutFormInitialize.create(request, (err: any, result: any) => {
-      if (err) return reject(err);
-      resolve(result);
-    });
+    try {
+      const iyzipay = getIyzipayClient();
+      iyzipay.checkoutFormInitialize.create(request, (err: any, result: any) => {
+        if (err) return reject(err);
+        resolve(result);
+      });
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
 // Ödeme tamamlandıktan sonra callback'te gelen token ile sonucu doğrular.
 export function retrieveCheckoutForm(token: string, conversationId: string): Promise<CheckoutFormResult> {
   return new Promise((resolve, reject) => {
-    iyzipay.checkoutForm.retrieve({
-      locale: Iyzipay.LOCALE.TR,
-      conversationId,
-      token
-    }, (err: any, result: any) => {
-      if (err) return reject(err);
-      resolve(result);
-    });
+    try {
+      const iyzipay = getIyzipayClient();
+      iyzipay.checkoutForm.retrieve({
+        locale: Iyzipay.LOCALE.TR,
+        conversationId,
+        token
+      }, (err: any, result: any) => {
+        if (err) return reject(err);
+        resolve(result);
+      });
+    } catch (err) {
+      reject(err);
+    }
   });
 }
