@@ -17,7 +17,7 @@ export const config = {
 
   // Server Configuration
   server: {
-    port: process.env.PORT || 3002,
+    port: process.env.PORT || 5000,
     nodeEnv: process.env.NODE_ENV || 'development',
     backendUrl: process.env.BACKEND_URL || 'http://localhost:5000',
   },

@@ -60,6 +60,22 @@ const authLimiter = rateLimit({
   store: makeRedisStore('rl:auth:'),
 });
 
+// Health check — Railway liveness için her zaman 200 (process ayakta).
+// Rate limiter veya CORS engeline takılmaması için tüm middleware'lerden önce tanımlanır.
+app.get('/api/health', (req, res) => {
+  const mongoConnected = mongoose.connection.readyState === 1;
+  res.status(200).json({
+    success: true,
+    status: mongoConnected ? 'ok' : 'degraded',
+    mongo: mongoConnected,
+    uptime: process.uptime(),
+  });
+});
+
+app.get('/', (req, res) => {
+  res.json({ message: 'Zade API çalışıyor!' });
+});
+
 app.use(cors({ origin: config.cors.origin }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // iyzico callback'i form-encoded gönderebilir
@@ -81,23 +97,6 @@ app.use('/api/reviews', reviewsRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
-
-// Health check — Railway liveness için her zaman 200 (process ayakta).
-// Mongo durumu body'de; deploy'u Mongo gecikmesiyle düşürmemek için 503 kullanılmaz.
-app.get('/api/health', (req, res) => {
-  const mongoConnected = mongoose.connection.readyState === 1;
-  res.status(200).json({
-    success: true,
-    status: mongoConnected ? 'ok' : 'degraded',
-    mongo: mongoConnected,
-    uptime: process.uptime(),
-  });
-});
-
-// Test endpoint
-app.get('/', (req, res) => {
-  res.json({ message: 'Zade API çalışıyor!' });
-});
 
 // 404 handler
 app.use((req, res) => {
