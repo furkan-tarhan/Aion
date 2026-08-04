@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction } from 'express';
+﻿import express, { Request, Response, NextFunction } from 'express';
 import User from '../models/User';
 import Listing from '../models/Listing';
 import bcrypt from 'bcrypt';
@@ -11,7 +11,7 @@ import { requireAdmin } from '../middleware/adminAuth';
 import { logger } from '../logger';
 
 const router = express.Router();
-const JWT_SECRET: string = process.env.JWT_SECRET ?? (() => { throw new Error('JWT_SECRET environment variable is required'); })();
+const JWT_SECRET: string = config.jwt.secret;
 
 const isAdminEmail = (email: string) => config.adminEmails.includes(email.trim().toLowerCase());
 

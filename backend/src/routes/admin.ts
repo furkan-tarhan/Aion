@@ -1,4 +1,5 @@
-import express, { Request, Response, NextFunction } from 'express';
+﻿import express, { Request, Response, NextFunction } from 'express';
+import { config } from '../config';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
 import Listing from '../models/Listing';
@@ -9,7 +10,7 @@ import { logger } from '../logger';
 import { swaggerSpec } from '../swagger';
 
 const router = express.Router();
-const JWT_SECRET: string = process.env.JWT_SECRET ?? (() => { throw new Error('JWT_SECRET environment variable is required'); })();
+const JWT_SECRET: string = config.jwt.secret;
 
 function authenticateToken(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];

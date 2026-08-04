@@ -2,6 +2,10 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// JWT_SECRET boşsa geliştirme ortamında çalışmayı engellememek için fallback sağlanır.
+// Production'da Railway/Vercel Variables'a gerçek değer girilmeli.
+const jwtSecret = process.env.JWT_SECRET || 'insecure-dev-secret-change-in-production';
+
 export const config = {
   // Steam API Configuration
   steam: {
@@ -20,6 +24,11 @@ export const config = {
     port: process.env.PORT || 5000,
     nodeEnv: process.env.NODE_ENV || 'development',
     backendUrl: process.env.BACKEND_URL || 'http://localhost:5000',
+  },
+
+  // JWT
+  jwt: {
+    secret: jwtSecret,
   },
 
   // CORS — virgülle birden fazla origin (Vercel production + preview URL'leri için)

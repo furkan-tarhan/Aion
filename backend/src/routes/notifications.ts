@@ -1,11 +1,12 @@
-import express, { Request, Response, NextFunction } from 'express';
+﻿import express, { Request, Response, NextFunction } from 'express';
+import { config } from '../config';
 import jwt from 'jsonwebtoken';
 import Notification from '../models/Notification';
 import User from '../models/User';
 import { getVapidPublicKey, isWebPushConfigured } from '../services/webPush';
 
 const router = express.Router();
-const JWT_SECRET: string = process.env.JWT_SECRET ?? (() => { throw new Error('JWT_SECRET environment variable is required'); })();
+const JWT_SECRET: string = config.jwt.secret;
 
 // JWT doğrulama middleware'i
 function authenticateToken(req: Request, res: Response, next: NextFunction) {

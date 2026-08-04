@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction } from 'express';
+﻿import express, { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
 import Transaction from '../models/Transaction';
@@ -8,7 +8,7 @@ import { createNotification, sendCriticalEmail } from '../services/notifications
 import { logger } from '../logger';
 
 const router = express.Router();
-const JWT_SECRET: string = process.env.JWT_SECRET ?? (() => { throw new Error('JWT_SECRET environment variable is required'); })();
+const JWT_SECRET: string = config.jwt.secret;
 
 // JWT doğrulama middleware'i
 function authenticateToken(req: Request, res: Response, next: NextFunction) {
