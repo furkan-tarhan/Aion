@@ -62,51 +62,7 @@ export default function HomeClient() {
         {/* ── Main content ─────────────────────────────────────────────────── */}
         <div className="absolute inset-0 z-10 flex flex-col" style={{ paddingTop: '64px' }}>
 
-          {/* ─ Desktop search bar ─ */}
-          <div className="hidden md:flex justify-center pt-5 pb-1 px-4">
-            <form onSubmit={handleSearch} className="relative w-full max-w-xs">
-              <div
-                className="flex items-center gap-2.5 rounded-md px-4 py-2 transition-all duration-200 focus-within:border-white/20"
-                style={{
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.09)',
-                }}
-              >
-                {/* Minimal search icon */}
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                  <circle cx="7" cy="7" r="5" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5"/>
-                  <line x1="11" y1="11" x2="15" y2="15" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Skin, silah veya kategori ara..."
-                  className="flex-1 bg-transparent outline-none text-[11px] placeholder-white/20 text-white/60"
-                  style={{ fontFamily: "'Inter','Helvetica Neue',sans-serif", letterSpacing: '0.04em' }}
-                />
-                {searchQuery && (
-                  <button
-                    type="submit"
-                    className="text-[9px] tracking-[0.2em] font-mono uppercase text-white/30 hover:text-white/60 transition-colors"
-                  >
-                    Ara
-                  </button>
-                )}
-              </div>
-            </form>
-          </div>
 
-          {/* ─ Page label (Vercel-style small text above hero) ─ */}
-          <div className="hidden md:block text-center py-1">
-            <p
-              className="text-[9px] tracking-[0.55em] uppercase font-mono"
-              style={{ color: 'rgba(255,255,255,0.18)' }}
-            >
-              Zade Market — Silah Seç
-            </p>
-          </div>
 
           {/* ─ Desktop: BuyMenuWheel ─ */}
           <div className="hidden md:flex flex-1 items-center justify-center px-4 overflow-hidden">
