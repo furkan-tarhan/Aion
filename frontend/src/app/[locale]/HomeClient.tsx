@@ -6,14 +6,13 @@ import Navbar from '@/components/Navbar';
 import BuyMenuWheel from '@/components/BuyMenuWheel';
 import ListingTicker from '@/components/ListingTicker';
 
-// ─── Mobile categories ────────────────────────────────────────────────────────
 const MOBILE_CATS = [
-  { id: 'rifles',  label: 'Tüfekler',       icon: '🔫', href: '/market?category=rifles'  },
-  { id: 'pistols', label: 'Tabancalar',      icon: '🔧', href: '/market?category=pistols' },
-  { id: 'smg',     label: 'SMG',             icon: '⚡', href: '/market?category=smg'     },
-  { id: 'heavy',   label: 'Ağır Silahlar',   icon: '💥', href: '/market?category=heavy'   },
-  { id: 'knives',  label: 'Bıçak & Eldiven', icon: '🔪', href: '/market?category=knives'  },
-  { id: 'cases',   label: 'Kasa & Diğer',    icon: '📦', href: '/market'                  },
+  { id: 'rifles',  label: 'Tüfekler',       href: '/market?category=rifles'  },
+  { id: 'pistols', label: 'Tabancalar',      href: '/market?category=pistols' },
+  { id: 'smg',     label: 'SMG',             href: '/market?category=smg'     },
+  { id: 'heavy',   label: 'Ağır Silahlar',   href: '/market?category=heavy'   },
+  { id: 'knives',  label: 'Bıçak & Eldiven', href: '/market?category=knives'  },
+  { id: 'cases',   label: 'Kasa & Diğer',    href: '/market'                  },
 ];
 
 export default function HomeClient() {
@@ -29,36 +28,33 @@ export default function HomeClient() {
 
   return (
     <>
-      {/* ── Fixed full-viewport shell ───────────────────────────────────────── */}
-      <div className="fixed inset-0 overflow-hidden bg-black">
+      <div className="fixed inset-0 overflow-hidden" style={{ background: '#000000' }}>
 
-        {/* CS2 Map Background */}
+        {/* ── Vercel-style radial glow behind the wheel ─────────────────────── */}
         <div
           aria-hidden
-          className="absolute inset-0 scale-105"
+          className="absolute inset-0 pointer-events-none"
           style={{
-            backgroundImage: "url('/images/bg-cs2-map.jpg')",
-            backgroundSize: 'cover',
-            backgroundPosition: 'center 40%',
-            filter: 'blur(4px) brightness(0.28) saturate(0.6)',
+            background: `
+              radial-gradient(ellipse 55% 55% at 50% 48%,
+                rgba(255,255,255,0.035) 0%,
+                rgba(255,255,255,0.012) 35%,
+                rgba(0,0,0,0) 70%
+              )
+            `,
           }}
         />
-        {/* Vignette overlay */}
+
+        {/* ── Subtle noise texture overlay ─────────────────────────────────── */}
         <div
           aria-hidden
-          className="absolute inset-0"
+          className="absolute inset-0 pointer-events-none opacity-[0.015]"
           style={{
-            background: 'radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(0,0,0,0.75) 100%)',
+            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E")`,
           }}
         />
-        {/* Bottom gradient for ticker readability */}
-        <div
-          aria-hidden
-          className="absolute bottom-0 left-0 right-0 h-32"
-          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)' }}
-        />
 
-        {/* ── Navbar (sits on top, transparent-ish) ────────────────────────── */}
+        {/* ── Navbar ──────────────────────────────────────────────────────────*/}
         <div className="relative z-30">
           <Navbar />
         </div>
@@ -66,24 +62,20 @@ export default function HomeClient() {
         {/* ── Main content ─────────────────────────────────────────────────── */}
         <div className="absolute inset-0 z-10 flex flex-col" style={{ paddingTop: '64px' }}>
 
-          {/* Search bar — desktop only, centered at top */}
-          <div className="hidden md:flex justify-center pt-4 pb-2 px-4">
-            <form onSubmit={handleSearch} className="relative w-full max-w-sm group">
+          {/* ─ Desktop search bar ─ */}
+          <div className="hidden md:flex justify-center pt-5 pb-1 px-4">
+            <form onSubmit={handleSearch} className="relative w-full max-w-xs">
               <div
-                className="flex items-center gap-2 rounded px-4 py-2 transition-all duration-200 group-focus-within:bg-black/50"
+                className="flex items-center gap-2.5 rounded-md px-4 py-2 transition-all duration-200 focus-within:border-white/20"
                 style={{
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.10)',
-                  backdropFilter: 'blur(8px)',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.09)',
                 }}
               >
-                {/* CS2-style crosshair icon */}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
-                  <circle cx="12" cy="12" r="8" stroke="#5a6373" strokeWidth="1.5"/>
-                  <line x1="12" y1="4" x2="12" y2="8"  stroke="#5a6373" strokeWidth="1.5" strokeLinecap="round"/>
-                  <line x1="12" y1="16" x2="12" y2="20" stroke="#5a6373" strokeWidth="1.5" strokeLinecap="round"/>
-                  <line x1="4"  y1="12" x2="8"  y2="12" stroke="#5a6373" strokeWidth="1.5" strokeLinecap="round"/>
-                  <line x1="16" y1="12" x2="20" y2="12" stroke="#5a6373" strokeWidth="1.5" strokeLinecap="round"/>
+                {/* Minimal search icon */}
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                  <circle cx="7" cy="7" r="5" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5"/>
+                  <line x1="11" y1="11" x2="15" y2="15" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round"/>
                 </svg>
                 <input
                   ref={inputRef}
@@ -91,99 +83,96 @@ export default function HomeClient() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Skin, silah veya kategori ara..."
-                  className="flex-1 bg-transparent outline-none text-xs tracking-wide placeholder-gray-600 text-gray-300"
-                  style={{ fontFamily: "'Rajdhani','Arial Narrow',sans-serif", letterSpacing: '0.08em' }}
+                  className="flex-1 bg-transparent outline-none text-[11px] placeholder-white/20 text-white/60"
+                  style={{ fontFamily: "'Inter','Helvetica Neue',sans-serif", letterSpacing: '0.04em' }}
                 />
                 {searchQuery && (
                   <button
                     type="submit"
-                    className="text-[10px] tracking-widest text-gray-400 hover:text-gray-200 font-mono transition-colors"
+                    className="text-[9px] tracking-[0.2em] font-mono uppercase text-white/30 hover:text-white/60 transition-colors"
                   >
-                    ARA
+                    Ara
                   </button>
                 )}
               </div>
             </form>
           </div>
 
-          {/* CS2 title text */}
-          <div className="hidden md:block text-center pb-1">
+          {/* ─ Page label (Vercel-style small text above hero) ─ */}
+          <div className="hidden md:block text-center py-1">
             <p
-              className="text-[9px] tracking-[0.45em] font-mono uppercase"
-              style={{ color: 'rgba(90,99,115,0.8)' }}
+              className="text-[9px] tracking-[0.55em] uppercase font-mono"
+              style={{ color: 'rgba(255,255,255,0.18)' }}
             >
               Zade Market — Silah Seç
             </p>
           </div>
 
-          {/* ── DESKTOP: BuyMenuWheel ─────────────────────────────────────── */}
+          {/* ─ Desktop: BuyMenuWheel ─ */}
           <div className="hidden md:flex flex-1 items-center justify-center px-4 overflow-hidden">
             <BuyMenuWheel />
           </div>
 
-          {/* ── MOBILE: Steam-style grid ──────────────────────────────────── */}
+          {/* ─ Mobile: minimal grid ─ */}
           <div className="md:hidden flex-1 overflow-y-auto px-4 pt-4 pb-4">
             {/* Mobile search */}
-            <form onSubmit={handleSearch} className="mb-4">
+            <form onSubmit={handleSearch} className="mb-5">
               <div
-                className="flex items-center gap-2 rounded px-3 py-2"
+                className="flex items-center gap-2 rounded-md px-3 py-2.5"
                 style={{
-                  background: 'rgba(255,255,255,0.08)',
-                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
                 }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                  <circle cx="11" cy="11" r="7" stroke="#5a6373" strokeWidth="1.8"/>
-                  <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="#5a6373" strokeWidth="1.8" strokeLinecap="round"/>
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                  <circle cx="7" cy="7" r="5" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5"/>
+                  <line x1="11" y1="11" x2="15" y2="15" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round"/>
                 </svg>
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Skin ara..."
-                  className="flex-1 bg-transparent outline-none text-sm text-gray-300 placeholder-gray-600"
+                  className="flex-1 bg-transparent outline-none text-sm text-white/60 placeholder-white/20"
                 />
               </div>
             </form>
 
-            {/* Category grid */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Category grid (Vercel card style) */}
+            <div className="grid grid-cols-2 gap-2">
               {MOBILE_CATS.map((cat) => (
                 <button
                   key={cat.id}
                   onClick={() => router.push(cat.href as any)}
-                  className="flex items-center gap-3 p-4 rounded text-left transition-all active:scale-95 hover:brightness-110"
+                  className="flex items-center justify-between p-4 rounded-md text-left transition-all duration-200 active:scale-[0.98] hover:border-white/20 group"
                   style={{
-                    background: 'rgba(20, 24, 30, 0.85)',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    backdropFilter: 'blur(6px)',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.07)',
                   }}
                 >
-                  <span className="text-2xl">{cat.icon}</span>
-                  <div>
-                    <div className="text-xs font-bold text-gray-200 uppercase tracking-wide">
-                      {cat.label}
-                    </div>
-                    <div className="text-[10px] text-gray-500 mt-0.5">Skinleri gör →</div>
-                  </div>
+                  <span
+                    className="text-[11px] font-medium tracking-wide uppercase text-white/50 group-hover:text-white/80 transition-colors"
+                    style={{ fontFamily: "'Inter','Helvetica Neue',sans-serif" }}
+                  >
+                    {cat.label}
+                  </span>
+                  <svg width="10" height="10" viewBox="0 0 16 16" fill="none" className="text-white/20 group-hover:text-white/50 transition-colors">
+                    <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
                 </button>
               ))}
             </div>
 
-            {/* Mobile market link */}
             <button
               onClick={() => router.push('/market' as any)}
-              className="mt-4 w-full py-3 text-center text-xs tracking-widest font-mono uppercase text-gray-400 rounded transition-all active:scale-98"
-              style={{
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.06)',
-              }}
+              className="mt-3 w-full py-3 text-center text-[10px] tracking-[0.3em] font-mono uppercase text-white/25 hover:text-white/50 transition-colors rounded-md"
+              style={{ border: '1px solid rgba(255,255,255,0.06)' }}
             >
-              Tüm Pazarı Gör →
+              Tüm Pazarı Gör
             </button>
           </div>
 
-          {/* ── Listing ticker (both desktop & mobile) ────────────────────── */}
+          {/* ─ Listing ticker ─ */}
           <div className="relative z-20">
             <ListingTicker />
           </div>
