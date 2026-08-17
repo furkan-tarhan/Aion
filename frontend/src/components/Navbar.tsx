@@ -26,14 +26,29 @@ const Navbar = () => {
   const [showResults, setShowResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, login } = useAuth();
   const router = useRouter();
   const [balance, setBalance] = useState<number | null>(null);
+  const [showNavbar, setShowNavbar] = useState(true);
 
   useEffect(() => {
-    const systemTheme = getSystemTheme();
-    setTheme(systemTheme);
-    document.documentElement.classList.toggle('dark', systemTheme === 'dark');
+    let lastScrollY = window.scrollY;
+
+    const handleScroll = () => {
+      if (window.scrollY > lastScrollY && window.scrollY > 80) {
+        setShowNavbar(false);
+      } else {
+        setShowNavbar(true);
+      }
+      lastScrollY = window.scrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+  
+  useEffect(() => {
+    document.documentElement.classList.add('dark');
   }, []);
 
   useEffect(() => {
@@ -93,23 +108,48 @@ const Navbar = () => {
     router.push('/');
   };
 
+  const handleSteamLogin = () => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    // apiBaseUrl boş olabilir (Nginx reverse proxy arkasında relative path) — bu durumda backend
+    // aynı origin'de sayılır, popup'ın postMessage origin'i sayfanın kendi origin'i olur.
+    const expectedOrigin = new URL(apiBaseUrl || '/', window.location.origin).origin;
+
+    const width = 600;
+    const height = 800;
+    const left = window.innerWidth / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    window.open(
+      `${apiBaseUrl}/api/auth/steam`,
+      'SteamLogin',
+      `width=${width},height=${height},top=${top},left=${left}`
+    );
+
+    const messageListener = (event: MessageEvent) => {
+      if (event.origin !== expectedOrigin) return;
+      if (event.data?.type === 'STEAM_LOGIN_SUCCESS' && event.data.token) {
+        login(event.data.token);
+        window.removeEventListener('message', messageListener);
+      }
+    };
+    window.addEventListener('message', messageListener);
+  };
+
   const otherLocale = routing.locales.find((l) => l !== locale) ?? locale;
 
   return (
-    <nav className="sticky top-0 z-50" style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+    <nav className={`fixed w-full top-0 z-50 transition-transform duration-300 ${showNavbar ? 'translate-y-0' : '-translate-y-full'}`} style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between h-16 items-center">
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-2 group">
               <div className="transition-all duration-300 group-hover:opacity-80">
-                <img
-                  src="/logo.png"
-                  alt="Zade Logo"
-                  className="h-8 w-8 object-contain brightness-0 invert opacity-80 group-hover:opacity-100 transition-opacity duration-300"
-                />
+                {/* Geçici bir ikon kullanabiliriz ya da logo.png kalabilir */}
+                <div className="h-8 w-8 bg-accent text-surface flex items-center justify-center rounded-md font-bold text-xl">L</div>
               </div>
-              <span className="text-lg font-semibold text-white/90 group-hover:text-white tracking-tight transition-colors duration-200" style={{ fontFamily: "'Inter','Helvetica Neue',sans-serif" }}>Zade</span>
+              <span className="text-xl font-bold text-foreground group-hover:text-accent tracking-tight transition-colors duration-200">
+                LoopSkins
+              </span>
             </Link>
           </div>
 
@@ -151,48 +191,7 @@ const Navbar = () => {
 
           {/* Sağ Menü */}
           <div className="hidden md:flex items-center space-x-4">
-            {/* Arama */}
-            <div className="relative flex items-center" ref={searchRef}>
-              <input
-                type="text"
-                placeholder={t('searchPlaceholder')}
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-                onFocus={() => searchResults.length > 0 && setShowResults(true)}
-                className="w-56 px-3 py-1.5 rounded-md focus:outline-none pr-8 text-sm transition-all duration-200"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.75)', fontFamily: "'Inter','Helvetica Neue',sans-serif" }}
-              />
-              <button className="absolute right-2.5 transition-colors" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                </svg>
-              </button>
-
-              {/* Arama Sonuçları Dropdown */}
-              {showResults && searchResults.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 rounded-md max-h-80 overflow-y-auto z-50" style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.8)' }}>
-                  {searchResults.map((skin: any, index: number) => (
-                    <Link
-                      key={skin.id || index}
-                      href={`/cs2/skins/${skin.category}/${skin.weapon?.toLowerCase().replace(/[^a-z0-9]/g, '-')}/${skin.id}`}
-                      className="flex items-center px-4 py-3 transition-colors border-b last:border-0"
-                      style={{ borderColor: 'rgba(255,255,255,0.06)' }}
-                      onClick={() => { setShowResults(false); setSearchQuery(''); }}
-                    >
-                      <div>
-                        <p className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.85)' }}>{skin.weapon} | {skin.name}</p>
-                        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>{skin.rarity}</p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-              {showResults && searchQuery.length >= 2 && searchResults.length === 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 rounded-md p-4 text-center text-sm z-50" style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.4)' }}>
-                  {t('noResults')}
-                </div>
-              )}
-            </div>
+            {/* Arama kaldırıldı */}
 
             {/* Auth Butonları */}
             {isAuthenticated && user ? (
@@ -233,20 +232,13 @@ const Navbar = () => {
               </div>
             ) : (
               <>
-                <Link
-                  href="/login"
-                  className="text-sm font-medium transition-colors duration-200"
-                  style={{ color: 'rgba(255,255,255,0.55)', fontFamily: "'Inter','Helvetica Neue',sans-serif" }}
-                >
-                  {t('login')}
-                </Link>
-                <Link
-                  href="/register"
-                  className="text-sm font-medium px-4 py-1.5 rounded-md transition-all duration-200 hover:bg-white hover:text-black"
-                  style={{ border: '1px solid rgba(255,255,255,0.5)', color: 'rgba(255,255,255,0.85)', fontFamily: "'Inter','Helvetica Neue',sans-serif" }}
-                >
-                  {t('register')}
-                </Link>
+              <button
+                onClick={handleSteamLogin}
+                className="text-sm font-bold px-4 py-2 rounded-md transition-all duration-300 bg-[#171a21] hover:bg-[#2a475e] text-white flex items-center gap-2 shadow-lg"
+              >
+                <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="Steam" className="w-5 h-5 brightness-0 invert" />
+                Steam ile Giriş Yap
+              </button>
               </>
             )}
 
@@ -262,23 +254,6 @@ const Navbar = () => {
               {otherLocale}
             </Link>
 
-            {/* Tema Butonu */}
-            <button
-              onClick={toggleTheme}
-              className="p-1.5 rounded-md transition-all duration-200 hover:bg-white/10"
-              style={{ border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.45)' }}
-              aria-label={t('toggleTheme')}
-            >
-              {theme === 'light' ? (
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m0 13.5V21m8.25-9H21M3 12H4.75m15.364 6.364l-1.591-1.591M6.227 6.227l-1.591-1.591m12.728 0l-1.591 1.591M6.227 17.773l-1.591 1.591M12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9z" />
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z" />
-                </svg>
-              )}
-            </button>
           </div>
 
           {/* Mobil Menü Butonu */}
@@ -321,8 +296,10 @@ const Navbar = () => {
               </>
             ) : (
               <>
-                <Link href="/login" className="block pl-4 pr-4 py-3 text-sm font-medium transition-colors" style={{ color: 'rgba(255,255,255,0.6)' }}>{t('login')}</Link>
-                <Link href="/register" className="block pl-4 pr-4 py-3 text-sm font-medium transition-colors" style={{ color: 'rgba(255,255,255,0.8)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>{t('register')}</Link>
+                <button onClick={handleSteamLogin} className="flex items-center gap-2 pl-4 pr-4 py-3 text-sm font-bold transition-colors bg-[#171a21] hover:bg-[#2a475e] text-white border-b border-white/5 w-full text-left">
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="Steam" className="w-5 h-5 brightness-0 invert" />
+                  Steam ile Giriş Yap
+                </button>
               </>
             )}
 
@@ -337,22 +314,6 @@ const Navbar = () => {
               >
                 {otherLocale}
               </Link>
-              <button
-                onClick={toggleTheme}
-                className="p-1.5 rounded-md transition-all duration-200"
-                style={{ border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.45)' }}
-                aria-label={t('toggleTheme')}
-              >
-                {theme === 'light' ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m0 13.5V21m8.25-9H21M3 12H4.75m15.364 6.364l-1.591-1.591M6.227 6.227l-1.591-1.591m12.728 0l-1.591 1.591M6.227 17.773l-1.591 1.591M12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9z" />
-                  </svg>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z" />
-                  </svg>
-                )}
-              </button>
             </div>
           </div>
         </div>

@@ -9,7 +9,7 @@ Uygulama tarafı hazır: `NEXT_PUBLIC_CDN_URL` tanımlıysa `/images/...` path'l
 ## 1) Cloudflare R2 bucket
 
 1. [dash.cloudflare.com](https://dash.cloudflare.com) → **R2** → **Create bucket**  
-   Örn. isim: `zade-assets`
+   Örn. isim: `loopskins-assets`
 2. Bucket → **Settings** → **Public access** / **Custom Domains**  
    - Ya R2.dev public URL kullan  
    - Ya da kendi subdomain bağla: `cdn.senindomain.com` → bucket'a bağla (önerilen)
@@ -38,7 +38,7 @@ Bucket kökünde şu yapı olmalı (path'ler DB ile aynı):
 cd frontend
 
 # images klasörünü bucket'a yükle (bucket adını kendi adınla değiştir)
-npx wrangler r2 object put zade-assets/images/Asiimov.webp --file=public/images/Asiimov.webp --content-type=image/webp
+npx wrangler r2 object put loopskins-assets/images/Asiimov.webp --file=public/images/Asiimov.webp --content-type=image/webp
 
 # Toplu yükleme için aşağıdaki sync script'i kullan (S3 API + R2 API token)
 ```
@@ -55,7 +55,7 @@ cd frontend
 $env:R2_ACCOUNT_ID="..."
 $env:R2_ACCESS_KEY_ID="..."
 $env:R2_SECRET_ACCESS_KEY="..."
-$env:R2_BUCKET="zade-assets"
+$env:R2_BUCKET="loopskins-assets"
 $env:R2_PUBLIC_URL="https://cdn.senindomain.com"
 
 npm run sync:cdn

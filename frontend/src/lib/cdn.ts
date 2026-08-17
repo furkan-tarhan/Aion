@@ -2,7 +2,7 @@
  * Skin / statik görseller için CDN URL çözümleyici.
  *
  * DB ve seed verisi göreli path tutar (`/images/Asiimov.webp`).
- * `NEXT_PUBLIC_CDN_URL` tanımlıysa (örn. https://cdn.zade.app) bu path CDN'e yönlendirilir;
+ * `NEXT_PUBLIC_CDN_URL` tanımlıysa (örn. https://cdn.loopskins.app) bu path CDN'e yönlendirilir;
  * tanımsızsa aynı origin'den (`/images/...`) servis edilir — lokal / Docker bozulmaz.
  */
 

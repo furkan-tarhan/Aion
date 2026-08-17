@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
+import { useSearchParams } from 'next/navigation';
 import { Link } from '@/i18n/navigation';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/lib/auth';
@@ -39,6 +40,8 @@ const rarityColors: Record<string, string> = {
 
 export default function MarketClient() {
     const t = useTranslations('market');
+    const searchParams = useSearchParams();
+    const searchQuery = searchParams.get('search') || '';
     const { isAuthenticated, user } = useAuth();
 
     const sortOptions = [
@@ -80,7 +83,9 @@ export default function MarketClient() {
     const [floatRange, setFloatRange] = useState({ min: '', max: '' });
     const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
     const [buyingId, setBuyingId] = useState<string | null>(null);
-    const [message, setMessage] = useState({ text: '', type: '' });
+    const [message, setMessage] = useState<{ text: string; type: string; tradeOfferUrl?: string }>({ text: '', type: '' });
+    const [buyModalListing, setBuyModalListing] = useState<any>(null);
+    const [buyTradeUrl, setBuyTradeUrl] = useState('');
 
     const fetchListings = useCallback(async () => {
         try {
@@ -91,6 +96,7 @@ export default function MarketClient() {
                 sort: sortBy,
                 weapon: weaponFilter || undefined,
                 rarity: rarityFilter || undefined,
+                search: searchQuery || undefined,
                 minPrice: priceRange.min || undefined,
                 maxPrice: priceRange.max === 999999 ? undefined : priceRange.max,
                 wear: wearFilter || undefined,
@@ -110,7 +116,7 @@ export default function MarketClient() {
         } finally {
             setLoading(false);
         }
-    }, [sortBy, rarityFilter, weaponFilter, priceRange, wearFilter, statTrakFilter, floatRange, pagination.page]);
+    }, [sortBy, rarityFilter, weaponFilter, priceRange, wearFilter, statTrakFilter, floatRange, pagination.page, searchQuery]);
 
     useEffect(() => {
         fetchListings();
@@ -124,21 +130,26 @@ export default function MarketClient() {
         }).format(price);
     };
 
-    const handleBuy = async (listing: any) => {
+    const openBuyModal = (listing: any) => {
         if (!isAuthenticated) {
             setMessage({ text: t('loginRequiredError'), type: 'error' });
             return;
         }
-        if (!confirm(t('buyConfirm', { title: listing.title, price: formatPrice(listing.price, listing.currency) }))) {
-            return;
-        }
+        setBuyTradeUrl('');
+        setBuyModalListing(listing);
+    };
+
+    const confirmBuy = async () => {
+        if (!buyModalListing) return;
+        const listing = buyModalListing;
 
         try {
             setBuyingId(listing._id);
             setMessage({ text: '', type: '' });
-            await listingsApi.buy(listing._id);
-            setMessage({ text: t('buySuccess'), type: 'success' });
+            const res = await listingsApi.buy(listing._id, buyTradeUrl || undefined);
+            setMessage({ text: t('buySuccess'), type: 'success', tradeOfferUrl: res.deliveryTradeOfferUrl });
             setListings(prev => prev.filter(l => l._id !== listing._id));
+            setBuyModalListing(null);
         } catch (err: any) {
             setMessage({ text: err.message || t('buyFailedDefault'), type: 'error' });
         } finally {
@@ -175,10 +186,10 @@ export default function MarketClient() {
                     {/* Başlık */}
                     <div className="text-center mb-12">
                         <h1 className="text-4xl font-semibold mb-4 text-white tracking-tight" style={{ fontFamily: "'Inter','Helvetica Neue',sans-serif" }}>
-                            {t('title')}
+                            {searchQuery ? `Arama Sonuçları: ${searchQuery}` : t('title')}
                         </h1>
                         <p className="text-sm text-white/50 max-w-2xl mx-auto" style={{ fontFamily: "'Inter','Helvetica Neue',sans-serif" }}>
-                            {t('description')}
+                            {t('description')} {searchQuery && `- "${searchQuery}" için sonuçlar listeleniyor`}
                         </p>
                         {isAuthenticated && (
                             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
@@ -196,6 +207,45 @@ export default function MarketClient() {
                             {message.type === 'error' && message.text.includes('bakiye') && (
                                 <> <Link href="/wallet" className="underline font-medium">{t('goToWallet')}</Link></>
                             )}
+                            {message.tradeOfferUrl && (
+                                <div className="mt-2">
+                                    <a href={message.tradeOfferUrl} target="_blank" rel="noopener noreferrer" className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg">
+                                        Steam Trade Teklifini Aç ve Kabul Et
+                                    </a>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {buyModalListing && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={() => setBuyModalListing(null)}>
+                            <div className="w-full max-w-md rounded-xl p-6 space-y-4" style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)' }} onClick={e => e.stopPropagation()}>
+                                <h3 className="text-lg font-bold text-white">{t('buyConfirm', { title: buyModalListing.title, price: formatPrice(buyModalListing.price, buyModalListing.currency) })}</h3>
+                                <div>
+                                    <label className="block text-sm font-medium text-white/70 mb-1.5">
+                                        Steam Trade URL <span className="text-white/40">(otomatik teslimat için — boş bırakabilirsiniz)</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={buyTradeUrl}
+                                        onChange={e => setBuyTradeUrl(e.target.value)}
+                                        placeholder="https://steamcommunity.com/tradeoffer/new/?partner=...&token=..."
+                                        className="w-full px-3 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white text-sm placeholder-white/30 focus:outline-none focus:border-white/30"
+                                    />
+                                </div>
+                                <div className="flex gap-3 justify-end pt-2">
+                                    <button onClick={() => setBuyModalListing(null)} className="px-4 py-2 text-sm text-white/60 hover:text-white">
+                                        Vazgeç
+                                    </button>
+                                    <button
+                                        onClick={confirmBuy}
+                                        disabled={buyingId === buyModalListing._id}
+                                        className="px-4 py-2 rounded-lg text-sm font-semibold bg-white text-black hover:bg-white/90 disabled:opacity-50"
+                                    >
+                                        {buyingId === buyModalListing._id ? t('processing') : t('buyNow')}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     )}
 
@@ -384,12 +434,22 @@ export default function MarketClient() {
                                             <p className="text-[11px] text-white/30 mt-2 font-mono">
                                                 {t('sellerLabel', { name: listing.seller?.username || t('unknownSeller') })}
                                             </p>
+                                            <div className="flex justify-between items-end mb-8 border-b border-white/10 pb-4">
+                                                <div>
+                                                    <h1 className="text-4xl font-bold text-foreground drop-shadow-md">
+                                                        {searchQuery ? `Arama Sonuçları: ${searchQuery}` : t('pageTitle')}
+                                                    </h1>
+                                                    <p className="text-muted mt-2">
+                                                        {t('pageSubtitle')} {searchQuery && `- "${searchQuery}" için sonuçlar listeleniyor`}
+                                                    </p>
+                                                </div>
+                                            </div>
                                             <div className="mt-auto pt-4 flex items-center justify-between">
                                                 <span className="text-white font-semibold tracking-tight text-lg">
                                                     {formatPrice(listing.price, listing.currency)}
                                                 </span>
                                                 <button
-                                                    onClick={() => handleBuy(listing)}
+                                                    onClick={() => openBuyModal(listing)}
                                                     disabled={buyingId === listing._id || listing.seller?._id === user?.userId || listing.seller === user?.userId}
                                                     className="px-4 py-1.5 rounded text-xs uppercase tracking-widest font-semibold transition-all hover:bg-white hover:text-black disabled:opacity-50 disabled:cursor-not-allowed"
                                                     style={{ border: '1px solid rgba(255,255,255,0.3)', color: 'rgba(255,255,255,0.9)' }}

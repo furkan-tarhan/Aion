@@ -44,7 +44,7 @@ Eksik env. Gerekli:
   $env:R2_ACCOUNT_ID="..."
   $env:R2_ACCESS_KEY_ID="..."
   $env:R2_SECRET_ACCESS_KEY="..."
-  $env:R2_BUCKET="zade-assets"
+  $env:R2_BUCKET="loopskins-assets"
   npm run sync:cdn
 `);
   process.exit(1);

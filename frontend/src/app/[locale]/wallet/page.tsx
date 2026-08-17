@@ -141,6 +141,20 @@ export default function WalletPage() {
     const formatMoney = (value: number) =>
         new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(value);
 
+    const handleTestDeposit = async () => {
+        try {
+            setMessage({ text: '', type: '' });
+            const res = await walletApi.testDeposit(1000); // 1000 TRY test bakiyesi
+            if (res.success) {
+                setMessage({ text: '1000 TRY Test Bakiyesi Eklendi!', type: 'success' });
+                setBalance(res.balance);
+                loadWallet();
+            }
+        } catch (err: any) {
+            setMessage({ text: err.message || 'Test yüklemesi başarısız', type: 'error' });
+        }
+    };
+
     if (!isAuthenticated) {
         return (
             <>
@@ -232,8 +246,26 @@ export default function WalletPage() {
 
                         <div className="p-8">
                             {activeTab === 'deposit' && (
-                                <form onSubmit={handleDeposit} className="space-y-4">
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                                <div className="space-y-4">
+                                    {/* Test Bakiye Yükleme Butonu — backend production'da bu endpoint'i 404 döner, o yüzden UI'da da gizlenir */}
+                                    {process.env.NODE_ENV !== 'production' && (
+                                        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 p-4 rounded-xl flex items-center justify-between mb-8 shadow-sm">
+                                            <div>
+                                                <h3 className="text-yellow-800 dark:text-yellow-400 font-bold mb-1">Geliştirici Testi</h3>
+                                                <p className="text-yellow-700/80 dark:text-yellow-500/80 text-sm">Ödeme altyapısını atlayarak anında 1000 TRY test bakiyesi yükleyebilirsiniz.</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={handleTestDeposit}
+                                                className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors shadow-md whitespace-nowrap"
+                                            >
+                                                +1000 TRY Test Ekle
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    <form onSubmit={handleDeposit} className="space-y-4">
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
                                         {t('depositSecurityNote')}
                                     </p>
                                     <div>
@@ -287,6 +319,7 @@ export default function WalletPage() {
                                         {depositSubmitting ? t('redirecting') : t('goToPaymentPage')}
                                     </button>
                                 </form>
+                                </div>
                             )}
 
                             {activeTab === 'withdraw' && (

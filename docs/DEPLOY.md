@@ -53,7 +53,7 @@ npm run seed:price-history
 3. Servis ayarları:
    - **Root Directory:** `backend`
    - Build/Start: `railway.toml` otomatik kullanılır (`npm run build` → `npm start`)
-4. **Settings → Networking → Generate Domain** → örn. `https://zade-api-production.up.railway.app`  
+4. **Settings → Networking → Generate Domain** → örn. `https://loopskins-api-production.up.railway.app`  
    Bu adresi not et (**BACKEND_URL**).
 5. **Variables** sekmesine şunları ekle (değerleri kendin doldur):
 

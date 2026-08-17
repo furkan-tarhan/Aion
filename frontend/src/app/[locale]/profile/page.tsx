@@ -347,7 +347,10 @@ export default function ProfilePage() {
                                                     <div>
                                                         <p className="font-semibold">{listing.skin?.weapon} | {listing.skin?.name}</p>
                                                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                            {listing.status === 'active' ? `🟢 ${t('statusActive')}` : listing.status === 'sold' ? `✅ ${t('statusSold')}` : `🔴 ${t('statusCancelled')}`}
+                                                            {listing.status === 'active' ? `🟢 ${t('statusActive')}`
+                                                                : listing.status === 'sold' ? `✅ ${t('statusSold')}`
+                                                                : listing.status === 'pending_deposit' ? '📦 Emanet Bekleniyor'
+                                                                : `🔴 ${t('statusCancelled')}`}
                                                         </p>
                                                     </div>
                                                     <p className="text-green-600 dark:text-green-400 font-bold text-lg">${listing.price}</p>

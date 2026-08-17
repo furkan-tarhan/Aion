@@ -1,6 +1,6 @@
 {
   "layout": {
-    "defaultTitle": "Zade - CS2 Digital Marketplace",
+    "defaultTitle": "LoopSkins - CS2 Digital Marketplace",
     "defaultDescription": "Buy and sell your CS2 skins safely. The best prices on the CS2 skin marketplace."
   },
   "common": {
@@ -32,7 +32,7 @@
   },
   "navbar": {
     "home": "Home",
-    "cs2Skin": "CS2 Skins",
+    "cs2Skin": "Skin",
     "market": "Market",
     "sell": "Sell",
     "searchPlaceholder": "Search skins...",
@@ -73,13 +73,13 @@
     "wear": "Wear"
   },
   "home": {
-    "heroTitle": "Zade - Digital Marketplace",
+    "heroTitle": "LoopSkins - Digital Marketplace",
     "heroDescription": "Buy and sell your CS2 skins safely, get the best prices",
     "popularProducts": "Popular Products",
     "viewDetails": "View",
     "noPriceInfo": "No price info",
-    "metaTitle": "Home | Zade",
-    "metaDescription": "Buy and sell your CS2 skins safely, get the best prices. AWP, AK-47, M4A4 and more popular CS2 skins on Zade."
+    "metaTitle": "Home | LoopSkins",
+    "metaDescription": "Buy and sell your CS2 skins safely, get the best prices. AWP, AK-47, M4A4 and more popular CS2 skins on LoopSkins."
   },
   "market": {
     "title": "Market",
@@ -164,7 +164,7 @@
     "backToCategory": "Back to {name}"
   },
   "skinDetail": {
-    "metaDescriptionFallback": "{title} - {rarity} rarity CS2 skin. Buy it safely on Zade.",
+    "metaDescriptionFallback": "{title} - {rarity} rarity CS2 skin. Buy it safely on LoopSkins.",
     "fetchError": "An error occurred while loading the skin data",
     "loading": "Loading skin...",
     "notFound": "Skin not found",

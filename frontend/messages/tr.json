@@ -1,6 +1,6 @@
 {
   "layout": {
-    "defaultTitle": "Zade - CS2 Dijital Ürün Pazarı",
+    "defaultTitle": "LoopSkins - CS2 Dijital Ürün Pazarı",
     "defaultDescription": "CS2 skinlerinizi güvenle alıp satın. En iyi fiyatlarla CS2 skin marketplace."
   },
   "common": {
@@ -32,7 +32,7 @@
   },
   "navbar": {
     "home": "Ana Sayfa",
-    "cs2Skin": "CS2 Skin",
+    "cs2Skin": "Skin",
     "market": "Market",
     "sell": "Sat",
     "searchPlaceholder": "Skin ara...",
@@ -73,13 +73,13 @@
     "wear": "Wear"
   },
   "home": {
-    "heroTitle": "Zade - Dijital Ürün Pazarı",
+    "heroTitle": "LoopSkins - Dijital Ürün Pazarı",
     "heroDescription": "CS2 skinlerinizi güvenle alıp satın, en iyi fiyatları yakalayın",
     "popularProducts": "Popüler Ürünler",
     "viewDetails": "İncele",
     "noPriceInfo": "Fiyat bilgisi yok",
-    "metaTitle": "Ana Sayfa | Zade",
-    "metaDescription": "CS2 skinlerinizi güvenle alıp satın, en iyi fiyatları yakalayın. AWP, AK-47, M4A4 ve daha fazla popüler CS2 skin Zade'de."
+    "metaTitle": "Ana Sayfa | LoopSkins",
+    "metaDescription": "CS2 skinlerinizi güvenle alıp satın, en iyi fiyatları yakalayın. AWP, AK-47, M4A4 ve daha fazla popüler CS2 skin LoopSkins'de."
   },
   "market": {
     "title": "Market",
@@ -164,7 +164,7 @@
     "backToCategory": "{name} Kategorisine Dön"
   },
   "skinDetail": {
-    "metaDescriptionFallback": "{title} - {rarity} nadirlikte CS2 skin. Zade'de güvenle satın alın.",
+    "metaDescriptionFallback": "{title} - {rarity} nadirlikte CS2 skin. LoopSkins'de güvenle satın alın.",
     "fetchError": "Skin verileri yüklenirken hata oluştu",
     "loading": "Skin yükleniyor...",
     "notFound": "Skin bulunamadı",

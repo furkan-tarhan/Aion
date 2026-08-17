@@ -1,6 +1,6 @@
 import mongoose, { Schema, Types } from 'mongoose';
 
-export type NotificationType = 'sale' | 'purchase' | 'deposit' | 'withdrawal' | 'review' | 'account_banned' | 'account_unbanned' | 'listing_removed';
+export type NotificationType = 'sale' | 'purchase' | 'deposit' | 'withdrawal' | 'review' | 'account_banned' | 'account_unbanned' | 'listing_removed' | 'listing_active';
 
 export interface INotification {
   user: Types.ObjectId;
@@ -19,7 +19,7 @@ const NotificationSchema = new Schema<INotification>({
   user: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   type: {
     type: String,
-    enum: ['sale', 'purchase', 'deposit', 'withdrawal', 'review', 'account_banned', 'account_unbanned', 'listing_removed'],
+    enum: ['sale', 'purchase', 'deposit', 'withdrawal', 'review', 'account_banned', 'account_unbanned', 'listing_removed', 'listing_active'],
     required: true,
     index: true
   },

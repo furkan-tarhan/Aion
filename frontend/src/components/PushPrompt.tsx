@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useAuth } from '@/lib/auth';
 import { notificationsApi } from '@/lib/api';
 
-const DISMISS_KEY = 'zade_push_prompt_dismissed';
+const DISMISS_KEY = 'loopskins_push_prompt_dismissed';
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);

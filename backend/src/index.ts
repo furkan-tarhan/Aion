@@ -21,8 +21,31 @@ import reviewsRoutes from './routes/reviews';
 import walletRoutes from './routes/wallet';
 import notificationRoutes from './routes/notifications';
 import adminRoutes from './routes/admin';
+import steamAuthRoutes from './routes/steamAuth';
+import session from 'express-session';
+import passport from 'passport';
+import { startSteamBot } from './services/steamBot';
 
 const app = express();
+
+// Session ayarları (Passport Steam stratejisi için gerekli)
+app.use(session({
+  secret: config.jwt.secret || 'loopskins_session_secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 24 * 60 * 60 * 1000 }
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Passport serialize/deserialize (sadece pass-through)
+passport.serializeUser((user: any, done) => {
+  done(null, user);
+});
+passport.deserializeUser((obj: any, done) => {
+  done(null, obj);
+});
 
 // Railway/Vercel gibi reverse proxy arkasında doğru client IP + rate-limit için gerekli.
 app.set('trust proxy', 1);
@@ -73,7 +96,7 @@ app.get('/api/health', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.json({ message: 'Zade API çalışıyor!' });
+  res.json({ message: 'LoopSkins API çalışıyor!' });
 });
 
 app.use(cors({ origin: config.cors.origin }));
@@ -86,11 +109,16 @@ mongoose.connect(config.database.uri)
   .then(() => logger.info({ event: 'mongo_connected' }, 'MongoDB bağlantısı başarılı'))
   .catch((err) => logger.error({ event: 'mongo_connection_error', err }, 'MongoDB bağlantı hatası'));
 
+// STEAM_BOT_* env değişkenleri tanımlıysa Steam trade botunu izole bir child process olarak başlatır
+// (bkz. services/steamBot.ts). Tanımlı değilse no-op — ilan/satın alma akışları manuel moda düşer.
+startSteamBot();
+
 // Routes
 app.use('/api/users/login', authLimiter);
 app.use('/api/users', userRoutes);
 app.use('/api/skins', skinRoutes);
 app.use('/api/steam', steamRoutes);
+app.use('/api/auth/steam', steamAuthRoutes);
 app.use('/api/listings', listingRoutes);
 app.use('/api/favorites', favoritesRoutes);
 app.use('/api/reviews', reviewsRoutes);

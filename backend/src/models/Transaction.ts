@@ -2,6 +2,7 @@ import mongoose, { Schema, Types } from 'mongoose';
 
 export type TransactionType = 'deposit' | 'withdrawal' | 'purchase' | 'sale';
 export type TransactionStatus = 'pending' | 'completed' | 'failed';
+export type DeliveryStatus = 'pending' | 'accepted' | 'declined' | 'canceled' | 'expired' | 'escrow';
 
 export interface ITransaction {
   user: Types.ObjectId;
@@ -13,6 +14,9 @@ export interface ITransaction {
   counterparty?: Types.ObjectId;
   paymentToken?: string;
   description?: string;
+  // 'purchase' işlemlerinde Steam trade bot teslimat durumu (bot yapılandırılmamışsa boş kalır)
+  deliveryOfferId?: string;
+  deliveryStatus?: DeliveryStatus;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,7 +40,9 @@ const TransactionSchema = new Schema<ITransaction>({
   listing: { type: Schema.Types.ObjectId, ref: 'Listing' },
   counterparty: { type: Schema.Types.ObjectId, ref: 'User' },
   paymentToken: { type: String, index: true },
-  description: { type: String }
+  description: { type: String },
+  deliveryOfferId: { type: String, index: true },
+  deliveryStatus: { type: String, enum: ['pending', 'accepted', 'declined', 'canceled', 'expired', 'escrow'] }
 }, {
   timestamps: true
 });

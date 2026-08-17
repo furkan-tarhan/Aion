@@ -7,7 +7,7 @@ import { cdnUrl, isCdnAssetPath } from '@/lib/cdn';
 const API_BASE_URL = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-export const SITE_NAME = 'Zade';
+export const SITE_NAME = 'LoopSkins';
 
 export function absoluteUrl(path: string): string {
   if (!path) return SITE_URL;

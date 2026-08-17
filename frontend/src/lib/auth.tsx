@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [token, setToken] = useState<string | null>(null);
 
     useEffect(() => {
-        const savedToken = localStorage.getItem('zade_token');
+        const savedToken = localStorage.getItem('loopskins_token');
         if (savedToken) {
             try {
                 const payload = JSON.parse(atob(savedToken.split('.')[1]));
@@ -39,16 +39,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     setToken(savedToken);
                     setUser({ userId: payload.userId, username: payload.username, email: payload.email, role: payload.role || 'user' });
                 } else {
-                    localStorage.removeItem('zade_token');
+                    localStorage.removeItem('loopskins_token');
                 }
             } catch {
-                localStorage.removeItem('zade_token');
+                localStorage.removeItem('loopskins_token');
             }
         }
     }, []);
 
     const login = (newToken: string) => {
-        localStorage.setItem('zade_token', newToken);
+        localStorage.setItem('loopskins_token', newToken);
         setToken(newToken);
         try {
             const payload = JSON.parse(atob(newToken.split('.')[1]));
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const logout = () => {
-        localStorage.removeItem('zade_token');
+        localStorage.removeItem('loopskins_token');
         setToken(null);
         setUser(null);
     };

@@ -38,7 +38,7 @@ test.describe('Auth — core', () => {
   test('login: mock API ile giriş sonrası ana sayfaya gider', async ({ page }) => {
     await loginViaUi(page);
     await expect(page).toHaveURL(/\/tr\/?$/);
-    await expect(page.getByRole('heading', { name: /Zade/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /LoopSkins/i }).first()).toBeVisible();
   });
 
   test('login: API hatası kullanıcıya gösterilir', async ({ page }) => {
@@ -73,7 +73,7 @@ test.describe('Korumalı sayfalar', () => {
   test('profil: giriş sonrası profil içeriği görünür', async ({ page }) => {
     const token = makeFakeJwt({ username: 'e2euser' });
     await page.addInitScript((t) => {
-      localStorage.setItem('zade_token', t);
+      localStorage.setItem('loopskins_token', t);
     }, token);
 
     // Profil sayfasının ek API çağrıları backend olmadan kırılmasın.
@@ -93,7 +93,7 @@ test.describe('Korumalı sayfalar', () => {
   test('sat: giriş sonrası satış formu görünür', async ({ page }) => {
     const token = makeFakeJwt({ username: 'e2euser' });
     await page.addInitScript((t) => {
-      localStorage.setItem('zade_token', t);
+      localStorage.setItem('loopskins_token', t);
     }, token);
 
     await page.route('**/api/**', async (route) => {

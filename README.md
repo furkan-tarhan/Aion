@@ -1,8 +1,10 @@
-# Zade — CS2 Dijital Ürün Pazarı
+# LoopSkins — CS2 Dijital Ürün Pazarı
 
 [![CI](https://github.com/L3x4-4/Bynogame/actions/workflows/ci.yml/badge.svg)](https://github.com/L3x4-4/Bynogame/actions/workflows/ci.yml)
 
 CS2 skinlerini güvenle alıp satabileceğiniz modern bir marketplace uygulaması.
+
+> **AI / geliştirici handoff:** Ne yapıldı, ne eksik, ne WIP → [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) (projeyi taramadan buradan başla).
 
 ## Teknoloji Stack
 
@@ -45,14 +47,22 @@ IYZICO_API_KEY=<iyzico-sandbox-api-key>
 IYZICO_SECRET_KEY=<iyzico-sandbox-secret-key>
 IYZICO_BASE_URL=https://sandbox-api.iyzipay.com
 ADMIN_EMAILS=admin@ornek.com
+
+# Opsiyonel — tanımlı değilse Steam trade botu devre dışı kalır, ilan/satın alma manuel akışa düşer
+STEAM_BOT_USERNAME=
+STEAM_BOT_PASSWORD=
+STEAM_BOT_SHARED_SECRET=
+STEAM_BOT_IDENTITY_SECRET=
 ```
 
 > **Not:** `ADMIN_EMAILS` içinde virgülle ayrılmış email adresleriyle register/login olan kullanıcılar otomatik olarak admin rolü alır ve `/admin` panelini görebilir.
 
+> **Not:** `STEAM_BOT_*` dördü de doldurulursa marketplace, satıcının item'ını otomatik emanete alıp satın alma sonrası alıcıya otomatik teslim eden bir Steam bot çalıştırır (bkz. `backend/.env.example`'daki detaylı açıklama ve `docs/PROJECT_STATUS.md`). Bu, marketplace'e ait ayrı bir Steam hesabı ve o hesapta etkin Steam Guard Mobile Authenticator gerektirir — kişisel hesabınla kullanma.
+
 > **Not:** `JWT_SECRET` için `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` kullanabilirsin.
 > **Not:** iyzico sandbox API bilgilerini almak için `backend/API_SETUP.md` içindeki "iyzico Sandbox Kurulumu" bölümüne bakabilirsin. Para çekme talepleri şu an otomatik değil — bakiye anında düşülür ama transfer manuel/banka tarafında yapılması beklenir.
 
-Production'a deploy ederken `frontend`'de `NEXT_PUBLIC_SITE_URL` ortam değişkenini gerçek domain'e ayarla (örn. `https://zade.com`) — `sitemap.xml`, `robots.txt` ve Open Graph URL'leri bu değeri kullanır. Ayarlanmazsa `http://localhost:3000`'e düşer.
+Production'a deploy ederken `frontend`'de `NEXT_PUBLIC_SITE_URL` ortam değişkenini gerçek domain'e ayarla (örn. `https://loopskins.com`) — `sitemap.xml`, `robots.txt` ve Open Graph URL'leri bu değeri kullanır. Ayarlanmazsa `http://localhost:3000`'e düşer.
 
 ### 3. Çalıştır
 
@@ -196,7 +206,7 @@ Kapsam: ana sayfa, login/register formları, market açılışı, korumalı prof
 ## Proje Yapısı
 
 ```
-Zade/
+LoopSkins/
 ├── backend/
 │   ├── src/
 │   │   ├── config.ts          # Merkezi konfigürasyon
@@ -259,6 +269,7 @@ Zade/
 - 📧 Email doğrulama + şifre sıfırlama
 - 💰 Steam Market fiyat entegrasyonu
 - 👛 Cüzdan / bakiye sistemi (iyzico ile para yatırma, bakiyeyle satın alma)
+- 🤖 Steam trade bot: emanet modeliyle otomatik ilan-teslim akışı (`STEAM_BOT_*` opsiyonel, izole child process'te çalışır)
 - 🔔 Bildirim sistemi (satış/alım, para yatırma/çekme, değerlendirme — in-app + kritik email)
 - 📈 Fiyat geçmişi grafikleri (platform satışları + Steam anlık fiyat referansı, Chart.js)
 - 🔎 SEO: sayfa bazlı meta/OG etiketleri, dinamik `sitemap.xml`, `robots.txt`, Product JSON-LD, hreflang alternates
@@ -278,6 +289,8 @@ Zade/
 ---
 
 ## 📋 Yapılacaklar (TODO / Roadmap)
+
+> Güncel durum + uncommitted WIP detayı: [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md)
 
 ### ✅ Tamamlanan İşler
 
@@ -324,7 +337,7 @@ Zade/
 
 - [x] **Profil Sayfası Backend Entegrasyonu** — Profil düzenleme, Steam hesap bağlama, istatistikler, favoriler tabı *(tamamlandı)*
 - [x] **Steam Envanter ile Satış Bağlantısı** — Sell sayfasında Steam envanterinden skin seçme *(tamamlandı)*
-- [ ] **Trade Offer Sistemi** — Steam Trade API ile otomatik takas *(ertelendi — Steam OAuth gerekir)*
+- [x] **Trade Offer Sistemi** — Steam bot (emanet modeli): ilan verirken item bota emanet edilir, satın alma sonrası bot otomatik alıcıya teslim eder. `STEAM_BOT_*` env değişkenleri tanımlı değilse devre dışı kalır, akış eskisi gibi manuele düşer *(kod tamam; gerçek bot hesabıyla uçtan uca doğrulanmadı — bkz. docs/PROJECT_STATUS.md §4)*
 - [x] **Bildirim Sistemi** — Satış/alım, para yatırma/çekme, değerlendirme bildirimleri (in-app polling + kritik olaylarda email) *(tamamlandı)*
 - [x] **Admin Paneli** — Kullanıcı yönetimi (ban/ban kaldırma, rol değiştirme), ilan moderasyonu (kaldırma), platform istatistikleri dashboard'u (`/admin`, `ADMIN_EMAILS` ile rol ataması) *(tamamlandı)*
 - [x] **Kullanıcı Değerlendirme Sistemi** — Alıcı/satıcı puanlama ve yorum (Review modeli + API) *(tamamlandı)*

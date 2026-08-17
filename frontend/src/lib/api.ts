@@ -3,7 +3,7 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('zade_token') : null;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('loopskins_token') : null;
 
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -83,13 +83,14 @@ export const steamApi = {
 
 // Listings API
 export const listingsApi = {
-    getAll: (params?: { page?: number; limit?: number; sort?: string; weapon?: string; rarity?: string; minPrice?: number; maxPrice?: number; wear?: string; statTrak?: boolean; minFloat?: number; maxFloat?: number }) => {
+    getAll: (params?: { page?: number; limit?: number; sort?: string; weapon?: string; rarity?: string; search?: string; minPrice?: number; maxPrice?: number; wear?: string; statTrak?: boolean; minFloat?: number; maxFloat?: number }) => {
         const query = new URLSearchParams();
         if (params?.page) query.set('page', String(params.page));
         if (params?.limit) query.set('limit', String(params.limit));
         if (params?.sort) query.set('sort', params.sort);
         if (params?.weapon) query.set('weapon', params.weapon);
         if (params?.rarity) query.set('rarity', params.rarity);
+        if (params?.search) query.set('search', params.search);
         if (params?.minPrice) query.set('minPrice', String(params.minPrice));
         if (params?.maxPrice) query.set('maxPrice', String(params.maxPrice));
         if (params?.wear) query.set('wear', params.wear);
@@ -102,11 +103,14 @@ export const listingsApi = {
     getById: (id: string) =>
         request<{ success: boolean; data: any }>(`/api/listings/${id}`),
 
-    create: (data: { skinId: string; price: number; steamTradeUrl: string; wear?: string; floatValue?: number; isStatTrak?: boolean }) =>
-        request<{ success: boolean; message: string; data: any }>('/api/listings', {
+    create: (data: { skinId: string; marketHashName?: string; iconUrl?: string; price: number; steamTradeUrl: string; wear?: string; floatValue?: number; isStatTrak?: boolean; assetId?: string }) =>
+        request<{ success: boolean; message: string; data: any; depositTradeOfferUrl?: string }>('/api/listings', {
             method: 'POST',
             body: JSON.stringify(data),
         }),
+
+    getDepositStatus: (id: string) =>
+        request<{ success: boolean; data: { status: string; depositStatus?: string; depositOfferId?: string; tradeOfferUrl?: string } }>(`/api/listings/${id}/deposit-status`),
 
     update: (id: string, data: { price?: number; steamTradeUrl?: string }) =>
         request<{ success: boolean; message: string; data: any }>(`/api/listings/${id}`, {
@@ -122,9 +126,10 @@ export const listingsApi = {
     getMyListings: () =>
         request<{ success: boolean; data: any[] }>('/api/listings/my/listings'),
 
-    buy: (id: string) =>
-        request<{ success: boolean; message: string; data: { listing: any; balance: number } }>(`/api/listings/${id}/buy`, {
+    buy: (id: string, steamTradeUrl?: string) =>
+        request<{ success: boolean; message: string; data: { listing: any; balance: number }; deliveryTradeOfferUrl?: string }>(`/api/listings/${id}/buy`, {
             method: 'POST',
+            body: JSON.stringify({ steamTradeUrl }),
         }),
 };
 
@@ -186,6 +191,12 @@ export const walletApi = {
         request<{ success: boolean; message?: string; data: { token: string; paymentPageUrl: string; checkoutFormContent?: string } }>('/api/wallet/deposit', {
             method: 'POST',
             body: JSON.stringify(data),
+        }),
+
+    testDeposit: (amount: number) =>
+        request<{ success: boolean; message: string; balance: number }>('/api/wallet/test-deposit', {
+            method: 'POST',
+            body: JSON.stringify({ amount }),
         }),
 
     withdraw: (data: { amount: number; iban: string }) =>

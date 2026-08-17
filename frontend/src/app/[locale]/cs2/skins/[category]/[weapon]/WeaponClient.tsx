@@ -74,12 +74,10 @@ export default function WeaponClient({ params }: { params: Promise<{ category: s
     return (
       <>
         <Navbar />
-        <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-blue-950 dark:to-blue-900">
-          <div className="container mx-auto px-4 py-12">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="mt-4 text-gray-600 dark:text-gray-300">{t('loading')}</p>
-            </div>
+        <main className="min-h-screen bg-background flex flex-col items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-accent mx-auto"></div>
+            <p className="mt-4 text-muted font-medium">{t('loading')}</p>
           </div>
         </main>
       </>
@@ -90,17 +88,15 @@ export default function WeaponClient({ params }: { params: Promise<{ category: s
     return (
       <>
         <Navbar />
-        <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-blue-950 dark:to-blue-900">
-          <div className="container mx-auto px-4 py-12">
-            <div className="text-center">
-              <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                {t('retry')}
-              </button>
-            </div>
+        <main className="min-h-screen bg-background flex flex-col items-center justify-center">
+          <div className="text-center">
+            <p className="text-red-500 font-medium mb-6">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-8 py-3 bg-surface border border-border hover:border-accent hover:text-accent text-foreground font-bold rounded-lg transition-all shadow-md"
+            >
+              {t('retry')}
+            </button>
           </div>
         </main>
       </>
@@ -110,32 +106,35 @@ export default function WeaponClient({ params }: { params: Promise<{ category: s
   return (
     <>
       <Navbar />
-      <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-blue-950 dark:to-blue-900">
-        <div className="container mx-auto px-4 py-12">
+      <main className="min-h-screen bg-background text-foreground font-sans pt-12 pb-24 relative overflow-hidden">
+        {/* Glow Effects */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[100px] pointer-events-none"></div>
+
+        <div className="container mx-auto px-6 max-w-7xl relative z-10">
           {/* Breadcrumb */}
-          <nav className="mb-8">
-            <ol className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
-              <li><Link href="/" className="hover:text-blue-600">{t('breadcrumbHome')}</Link></li>
+          <nav className="mb-10">
+            <ol className="flex items-center space-x-2 text-sm text-muted">
+              <li><Link href="/" className="hover:text-accent transition-colors">{t('breadcrumbHome')}</Link></li>
               <li>/</li>
-              <li><Link href="/cs2" className="hover:text-blue-600">CS2</Link></li>
+              <li><Link href="/cs2" className="hover:text-accent transition-colors">CS2</Link></li>
               <li>/</li>
-              <li><Link href="/cs2/skins" className="hover:text-blue-600">{t('breadcrumbSkins')}</Link></li>
+              <li><Link href="/cs2/skins" className="hover:text-accent transition-colors">{t('breadcrumbSkins')}</Link></li>
               <li>/</li>
-              <li><Link href={`/cs2/skins/${category.slug}`} className="hover:text-blue-600">{category.name}</Link></li>
+              <li><Link href={`/cs2/skins/${category.slug}`} className="hover:text-accent transition-colors">{category.name}</Link></li>
               <li>/</li>
-              <li className="text-gray-900 dark:text-gray-100 font-medium">{weapon.name}</li>
+              <li className="text-foreground font-medium">{weapon.name}</li>
             </ol>
           </nav>
 
           {/* Header */}
-          <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold mb-4">{weapon.name}</h1>
+          <div className="text-center mb-16">
+            <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight">{weapon.name}</h1>
             {weapon.description && (
-              <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+              <p className="text-lg text-muted max-w-2xl mx-auto font-medium mb-4">
                 {weapon.description}
               </p>
             )}
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+            <p className="text-sm text-accent font-semibold">
               {t('skinsAvailable', { count: skins.length })}
             </p>
           </div>
@@ -153,10 +152,10 @@ export default function WeaponClient({ params }: { params: Promise<{ category: s
           </div>
 
           {/* Geri Dön Butonu */}
-          <div className="mt-12 text-center">
+          <div className="mt-16 text-center">
             <Link
               href={`/cs2/skins/${category.slug}`}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              className="inline-flex items-center px-8 py-4 bg-surface border border-border hover:border-accent hover:text-accent text-foreground font-bold rounded-lg transition-all shadow-md"
             >
               ← {t('backToCategory', { name: category.name })}
             </Link>
