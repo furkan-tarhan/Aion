@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { buildLanguageAlternates } from '@/lib/seo';
@@ -23,5 +24,9 @@ export async function generateMetadata({
 }
 
 export default function MarketPage() {
-  return <MarketClient />;
+  return (
+    <Suspense>
+      <MarketClient />
+    </Suspense>
+  );
 }
