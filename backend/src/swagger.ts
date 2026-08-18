@@ -12,7 +12,7 @@ const routesDir = path.join(__dirname, 'routes').split(path.sep).join('/');
 const definition: swaggerJSDoc.OAS3Definition = {
   openapi: '3.0.0',
   info: {
-    title: 'Zade API',
+    title: 'LoopSkins API',
     version: '1.0.0',
     description:
       'CS2 dijital ürün pazarı (skin alım/satım, cüzdan, bildirim, admin paneli) için REST API dokümantasyonu.',

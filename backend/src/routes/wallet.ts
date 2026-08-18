@@ -1,4 +1,4 @@
-﻿import express, { Request, Response, NextFunction } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
 import Transaction from '../models/Transaction';
@@ -172,6 +172,41 @@ router.get('/transactions', authenticateToken, async (req, res) => {
  *       502: { description: Ödeme sağlayıcıya bağlanılamadı }
  *       503: { description: Ödeme sağlayıcı yapılandırılmamış }
  */
+// TEST için sahte bakiye yükleme (sadece geliştirme amaçlı — production'da kapalıdır)
+router.post('/test-deposit', authenticateToken, async (req, res) => {
+  if (config.server.nodeEnv === 'production') {
+    return res.status(404).json({ success: false, message: 'Endpoint bulunamadı' });
+  }
+  try {
+    const userId = (req as any).user.userId;
+    const { amount } = req.body;
+    
+    const parsedAmount = Number(amount);
+    if (!parsedAmount || parsedAmount <= 0) {
+      return res.status(400).json({ success: false, message: 'Geçersiz tutar' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı' });
+
+    user.balance += parsedAmount;
+    await user.save();
+
+    const transaction = new Transaction({
+      user: userId,
+      type: 'deposit',
+      amount: parsedAmount,
+      status: 'completed',
+      description: 'Test bakiye yükleme (Admin)'
+    });
+    await transaction.save();
+
+    res.json({ success: true, message: `${parsedAmount} TRY test bakiyesi eklendi`, balance: user.balance });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Hata oluştu' });
+  }
+});
+
 // Para yatırma başlat — iyzico Checkout Form oturumu oluşturur
 router.post('/deposit', authenticateToken, async (req, res) => {
   try {

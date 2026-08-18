@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Zade — CS2 Dijital Ürün Pazarı',
-    short_name: 'Zade',
+    name: 'LoopSkins — CS2 Dijital Ürün Pazarı',
+    short_name: 'LoopSkins',
     description: 'CS2 skinlerini güvenle alıp satabileceğiniz marketplace',
     start_url: '/tr',
     scope: '/',

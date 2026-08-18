@@ -10,6 +10,8 @@ export const LISTING_WEAR_VALUES: ListingWear[] = [
   'Battle-Scarred'
 ];
 
+export type ListingDepositStatus = 'pending' | 'accepted' | 'declined' | 'canceled' | 'expired';
+
 export interface IListing {
   seller: Types.ObjectId;
   skin: Types.ObjectId;
@@ -20,12 +22,19 @@ export interface IListing {
   price: number;
   currency: string;
   steamTradeUrl: string;
-  status: 'active' | 'sold' | 'cancelled';
+  // 'pending_deposit': bot satıcıdan item'ı istedi, henüz onaylanmadı (item pazarda görünmez).
+  // 'active': item bot envanterinde, satın alınabilir (bot yapılandırılmamışsa item her zaman satıcıda kalır).
+  status: 'pending_deposit' | 'active' | 'sold' | 'cancelled';
   buyer?: Types.ObjectId;
   soldAt?: Date;
   wear?: ListingWear;
   floatValue?: number;
   isStatTrak: boolean;
+  // Steam trade bot emanet akışı (bot yapılandırılmamışsa hepsi boş kalır, manuel akışa düşülür)
+  assetId?: string; // seller'ın envanterindeki orijinal Steam assetid
+  depositOfferId?: string;
+  depositStatus?: ListingDepositStatus;
+  botAssetId?: string; // deposit kabul edildikten sonra item'ın bot envanterindeki yeni assetid'i
   createdAt: Date;
   updatedAt: Date;
 }
@@ -42,7 +51,7 @@ const ListingSchema = new Schema<IListing>({
   steamTradeUrl: { type: String, required: true },
   status: {
     type: String,
-    enum: ['active', 'sold', 'cancelled'],
+    enum: ['pending_deposit', 'active', 'sold', 'cancelled'],
     default: 'active',
     index: true
   },
@@ -50,7 +59,11 @@ const ListingSchema = new Schema<IListing>({
   soldAt: Date,
   wear: { type: String, enum: LISTING_WEAR_VALUES, index: true },
   floatValue: { type: Number, min: 0, max: 1 },
-  isStatTrak: { type: Boolean, default: false, index: true }
+  isStatTrak: { type: Boolean, default: false, index: true },
+  assetId: String,
+  depositOfferId: { type: String, index: true },
+  depositStatus: { type: String, enum: ['pending', 'accepted', 'declined', 'canceled', 'expired'] },
+  botAssetId: String
 }, {
   timestamps: true
 });

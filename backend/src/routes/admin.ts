@@ -8,6 +8,7 @@ import { requireAdmin } from '../middleware/adminAuth';
 import { createNotification, sendCriticalEmail } from '../services/notifications';
 import { logger } from '../logger';
 import { swaggerSpec } from '../swagger';
+import { getBotStatus } from '../services/steamBot';
 
 const router = express.Router();
 const JWT_SECRET: string = config.jwt.secret;
@@ -25,6 +26,23 @@ function authenticateToken(req: Request, res: Response, next: NextFunction) {
 }
 
 router.use(authenticateToken, requireAdmin);
+
+/**
+ * @swagger
+ * /admin/bot-status:
+ *   get:
+ *     summary: Steam trade botunun durumu (yapılandırılmış mı, oturum açık mı)
+ *     tags: [Admin]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Bot durumu }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+// Steam trade bot durumu
+router.get('/bot-status', (req: Request, res: Response) => {
+  res.json({ success: true, data: getBotStatus() });
+});
 
 /**
  * @swagger

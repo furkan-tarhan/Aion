@@ -1,14 +1,25 @@
 import express from 'express';
-import { 
-  getSteamUserProfile, 
-  getCS2Skins, 
-  getUserSkinsWithPrices, 
-  calculateInventoryValue, 
+import {
+  getSteamUserProfile,
+  getCS2Skins,
+  getUserSkinsWithPrices,
+  calculateInventoryValue,
   getMostExpensiveSkins,
-  getSteamMarketPrice
+  getSteamMarketPrice,
+  SteamInventoryError
 } from '../services/steamApi';
 
 const router = express.Router();
+
+// Envanter fonksiyonlarının fırlattığı SteamInventoryError'ı uygun HTTP status'e çevirir
+function handleInventoryError(error: unknown, res: express.Response) {
+  if (error instanceof SteamInventoryError) {
+    const status = error.code === 'private' ? 403 : error.code === 'rate_limited' ? 429 : 502;
+    return res.status(status).json({ success: false, code: error.code, error: error.message, message: error.message });
+  }
+  console.error('Steam inventory error:', error);
+  return res.status(500).json({ success: false, error: 'Internal server error' });
+}
 
 /**
  * @swagger
@@ -80,11 +91,7 @@ router.get('/inventory/:steamId', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error fetching Steam inventory:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
+    handleInventoryError(error, res);
   }
 });
 
@@ -118,11 +125,7 @@ router.get('/inventory/:steamId/prices', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error fetching Steam inventory with prices:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
+    handleInventoryError(error, res);
   }
 });
 
@@ -155,11 +158,7 @@ router.get('/inventory/:steamId/value', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error calculating inventory value:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
+    handleInventoryError(error, res);
   }
 });
 
@@ -194,11 +193,7 @@ router.get('/inventory/:steamId/expensive', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error fetching expensive skins:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
+    handleInventoryError(error, res);
   }
 });
 
@@ -291,11 +286,7 @@ router.get('/inventory/:steamId/stats', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error fetching inventory stats:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
+    handleInventoryError(error, res);
   }
 });
 

@@ -116,92 +116,100 @@ export async function getSteamUserProfile(steamId: string): Promise<SteamUserPro
   }
 }
 
+// steamcommunity.com/inventory public endpoint'inin özel/rate-limit/erişilemez durumlarını
+// ayırt edebilmek için tipli hata (route katmanı buna göre 403/429/502 döner).
+export class SteamInventoryError extends Error {
+  constructor(public code: 'private' | 'rate_limited' | 'unavailable', message: string) {
+    super(message);
+    this.name = 'SteamInventoryError';
+  }
+}
+
 // Steam API ile kullanıcı envanteri getirme
 export async function getSteamInventory(steamId: string, appId: number = 730): Promise<SteamInventoryItem[]> {
+  let response;
   try {
-    const response = await axios.get(
-      `${config.steam.baseUrl}/ISteamUserOAuth/GetInventory/v1/?key=${config.steam.apiKey}&steamid=${steamId}&appid=${appId}`
+    response = await axios.get(
+      `https://steamcommunity.com/inventory/${steamId}/${appId}/2?l=english&count=2000`
     );
-    
-    if (response.data.response && response.data.response.assets) {
-      return response.data.response.assets;
+  } catch (error: any) {
+    const status = error?.response?.status;
+    if (status === 403 || status === 401) {
+      throw new SteamInventoryError('private', 'Steam envanteri gizli. Steam gizlilik ayarlarından envanteri herkese açık yapın.');
     }
-    
-    return [];
-  } catch (error) {
+    if (status === 429) {
+      throw new SteamInventoryError('rate_limited', 'Steam şu an çok fazla istek alıyor, lütfen birazdan tekrar deneyin.');
+    }
     console.error('Steam Inventory API error:', error);
-    return [];
+    throw new SteamInventoryError('unavailable', 'Steam envanterine ulaşılamadı.');
   }
+
+  // Steam, gizli envanterlerde de HTTP 200 + { success: false } dönebilir
+  if (response.data?.success === false) {
+    throw new SteamInventoryError('private', 'Steam envanterine ulaşılamadı. Envanterinizin herkese açık olduğundan emin olun.');
+  }
+
+  if (response.data && response.data.assets && response.data.descriptions) {
+    const { assets, descriptions } = response.data;
+
+    // Asset ve Description'ları classid+instanceid üzerinden birleştir
+    return assets.map((asset: any) => {
+      const desc = descriptions.find(
+        (d: any) => d.classid === asset.classid && d.instanceid === asset.instanceid
+      );
+      return {
+        ...asset,
+        ...desc
+      };
+    });
+  }
+
+  // assets/descriptions yoksa envanter gerçekten boştur
+  return [];
 }
 
 // Steam API ile kullanıcının CS2 skinlerini getirme
 export async function getCS2Skins(steamId: string): Promise<SteamInventoryItem[]> {
-  try {
-    const inventory = await getSteamInventory(steamId, 730);
-    
-    // Sadece CS2 skinlerini filtrele
-    const cs2Skins = inventory.filter(item => 
-      item.marketable === 1 && 
-      item.tradeable === 1 &&
-      item.market_hash_name.includes('|')
-    );
-    
-    return cs2Skins;
-  } catch (error) {
-    console.error('Error fetching CS2 skins:', error);
-    return [];
-  }
+  const inventory = await getSteamInventory(steamId, 730);
+
+  // Sadece CS2 skinlerini filtrele (marketable ve içinde | işareti olanlar genelde silah/bıçaktır)
+  return inventory.filter(item =>
+    item.marketable === 1 &&
+    (item as any).tradable === 1 &&
+    item.market_hash_name && item.market_hash_name.includes('|')
+  );
 }
 
 // Steam API ile kullanıcının skin fiyatlarını getirme
 export async function getUserSkinsWithPrices(steamId: string): Promise<Array<SteamInventoryItem & { price: number | null }>> {
-  try {
-    const skins = await getCS2Skins(steamId);
-    const skinsWithPrices = [];
-    
-    for (const skin of skins) {
-      const price = await getSteamMarketPrice(skin.market_hash_name);
-      skinsWithPrices.push({
-        ...skin,
-        price: price
-      });
-    }
-    
-    return skinsWithPrices;
-  } catch (error) {
-    console.error('Error fetching user skins with prices:', error);
-    return [];
+  const skins = await getCS2Skins(steamId);
+  const skinsWithPrices = [];
+
+  for (const skin of skins) {
+    const price = await getSteamMarketPrice(skin.market_hash_name);
+    skinsWithPrices.push({
+      ...skin,
+      price: price
+    });
   }
+
+  return skinsWithPrices;
 }
 
 // Steam API ile kullanıcının envanter değerini hesaplama
 export async function calculateInventoryValue(steamId: string): Promise<number> {
-  try {
-    const skinsWithPrices = await getUserSkinsWithPrices(steamId);
-    
-    const totalValue = skinsWithPrices.reduce((total, skin) => {
-      return total + (skin.price || 0);
-    }, 0);
-    
-    return totalValue;
-  } catch (error) {
-    console.error('Error calculating inventory value:', error);
-    return 0;
-  }
+  const skinsWithPrices = await getUserSkinsWithPrices(steamId);
+
+  return skinsWithPrices.reduce((total, skin) => total + (skin.price || 0), 0);
 }
 
 // Steam API ile kullanıcının en pahalı skinlerini getirme
 export async function getMostExpensiveSkins(steamId: string, limit: number = 10): Promise<Array<SteamInventoryItem & { price: number | null }>> {
-  try {
-    const skinsWithPrices = await getUserSkinsWithPrices(steamId);
-    
-    // Fiyata göre sırala ve limit kadar döndür
-    return skinsWithPrices
-      .filter(skin => skin.price !== null)
-      .sort((a, b) => (b.price || 0) - (a.price || 0))
-      .slice(0, limit);
-  } catch (error) {
-    console.error('Error fetching most expensive skins:', error);
-    return [];
-  }
+  const skinsWithPrices = await getUserSkinsWithPrices(steamId);
+
+  // Fiyata göre sırala ve limit kadar döndür
+  return skinsWithPrices
+    .filter(skin => skin.price !== null)
+    .sort((a, b) => (b.price || 0) - (a.price || 0))
+    .slice(0, limit);
 } 

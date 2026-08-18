@@ -10,8 +10,14 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
+        background: "#21201e",
+        foreground: "#fcf5e8",
+        surface: "#191816",
+        surfaceHover: "#302e2a",
+        accent: "#e9bc1c",
+        accentHover: "#f5c71b",
+        muted: "#9a958b",
+        border: "#3f3c38"
       },
       keyframes: {
         spin: {

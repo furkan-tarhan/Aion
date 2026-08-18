@@ -30,7 +30,7 @@ export default function SellPage() {
         { value: '', label: t('wearUnspecified') },
         ...Object.entries(WEAR_VALUE_LABELS).map(([value, label]) => ({ value, label })),
     ];
-    const { isAuthenticated, user } = useAuth();
+    const { isAuthenticated, user, login } = useAuth();
     const [steamTradeUrl, setSteamTradeUrl] = useState('');
     const [selectedSkin, setSelectedSkin] = useState<any>(null);
     const [skinSearch, setSkinSearch] = useState('');
@@ -47,7 +47,24 @@ export default function SellPage() {
     const [showInventory, setShowInventory] = useState(false);
     const [loadingInventory, setLoadingInventory] = useState(false);
     const [userSteamId, setUserSteamId] = useState<string | null>(null);
+    const [depositInfo, setDepositInfo] = useState<{ listingId: string; tradeOfferUrl: string; status: string } | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Steam bot emanet akışı aktifse (depositInfo dolu), ilanın bota teslim edilip edilmediğini poll et
+    useEffect(() => {
+        if (!depositInfo || depositInfo.status !== 'pending') return;
+        const interval = setInterval(async () => {
+            try {
+                const res = await listingsApi.getDepositStatus(depositInfo.listingId);
+                if (res.success && res.data.depositStatus && res.data.depositStatus !== 'pending') {
+                    setDepositInfo(prev => prev ? { ...prev, status: res.data.depositStatus! } : prev);
+                }
+            } catch {
+                // sessizce yeniden dene
+            }
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [depositInfo]);
 
     // Skin arama (debounced)
     useEffect(() => {
@@ -103,8 +120,8 @@ export default function SellPage() {
                 setSteamInventory(data.data.skins);
                 setShowInventory(true);
             }
-        } catch {
-            setError(t('steamInventoryLoadError'));
+        } catch (err) {
+            setError(err instanceof Error && err.message ? err.message : t('steamInventoryLoadError'));
         } finally {
             setLoadingInventory(false);
         }
@@ -149,15 +166,21 @@ export default function SellPage() {
 
         try {
             setSubmitting(true);
-            await listingsApi.create({
-                skinId: selectedSkin.id,
+            const res = await listingsApi.create({
+                skinId: selectedSkin.id || selectedSkin.market_hash_name, // Fallback for backend
+                marketHashName: selectedSkin.market_hash_name,
+                iconUrl: selectedSkin.icon_url ? `https://community.akamai.steamstatic.com/economy/image/${selectedSkin.icon_url}` : selectedSkin.image,
                 price: Number(price),
                 steamTradeUrl,
                 wear: wear || undefined,
                 floatValue: floatValue ? Number(floatValue) : undefined,
                 isStatTrak,
+                assetId: selectedSkin.assetid,
             });
             setSubmitted(true);
+            if (res.depositTradeOfferUrl && res.data?._id) {
+                setDepositInfo({ listingId: res.data._id, tradeOfferUrl: res.depositTradeOfferUrl, status: 'pending' });
+            }
             setSelectedSkin(null);
             setSkinSearch('');
             setPrice('');
@@ -173,31 +196,51 @@ export default function SellPage() {
         }
     };
 
+    const handleSteamLogin = () => {
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+        const expectedOrigin = new URL(apiBaseUrl || '/', window.location.origin).origin;
+
+        const width = 600;
+        const height = 800;
+        const left = window.innerWidth / 2 - width / 2;
+        const top = window.screen.height / 2 - height / 2;
+        window.open(
+            `${apiBaseUrl}/api/auth/steam`,
+            'SteamLogin',
+            `width=${width},height=${height},top=${top},left=${left}`
+        );
+
+        const messageListener = (event: MessageEvent) => {
+            if (event.origin !== expectedOrigin) return;
+            if (event.data?.type === 'STEAM_LOGIN_SUCCESS' && event.data.token) {
+                login(event.data.token);
+                window.removeEventListener('message', messageListener);
+            }
+        };
+        window.addEventListener('message', messageListener);
+    };
+
     if (!isAuthenticated) {
         return (
             <>
                 <Navbar />
-                <main className="relative min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-blue-950 dark:to-blue-900 flex items-center justify-center px-4">
-                    <div className="fixed inset-0 -z-10 overflow-hidden opacity-10 dark:opacity-20">
-                        <div className="absolute inset-0 bg-[url('/logo.png')] bg-no-repeat bg-center bg-contain"></div>
-                    </div>
-                    <div className="text-center max-w-md">
-                        <div className="bg-white/90 dark:bg-blue-900/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-200 dark:border-blue-800 p-8">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 mx-auto mb-4 text-blue-500">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                            </svg>
-                            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">{t('loginRequiredTitle')}</h2>
-                            <p className="text-gray-600 dark:text-gray-300 mb-6">
-                                {t('loginRequiredMessage')}
-                            </p>
-                            <div className="flex flex-col gap-3">
-                                <Link href="/login" className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-semibold text-center">
-                                    {t('login')}
-                                </Link>
-                                <Link href="/register" className="text-blue-600 dark:text-blue-400 hover:text-blue-800 font-medium">
-                                    {t('createAccount')}
-                                </Link>
+                <main className="relative min-h-screen bg-background flex items-center justify-center px-4 overflow-hidden">
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-accent/5 rounded-full blur-[120px] pointer-events-none"></div>
+                    <div className="text-center max-w-md relative z-10 w-full">
+                        <div className="bg-surface rounded-2xl shadow-2xl border border-border p-10 flex flex-col items-center">
+                            <div className="w-20 h-20 bg-background border border-border rounded-full flex items-center justify-center mb-6 shadow-inner">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10 text-accent">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                                </svg>
                             </div>
+                            <h2 className="text-3xl font-bold text-foreground mb-3 tracking-tight">{t('loginRequiredTitle')}</h2>
+                            <p className="text-muted mb-8 font-medium">
+                                Skin satışı yapabilmek için hesabınıza Steam ile giriş yapmanız gerekiyor.
+                            </p>
+                            <button onClick={handleSteamLogin} className="w-full flex items-center justify-center gap-3 bg-[#171a21] hover:bg-[#2a475e] text-white py-4 rounded-xl transition-all font-bold text-lg shadow-xl">
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="Steam" className="w-6 h-6 brightness-0 invert" />
+                                Steam ile Giriş Yap
+                            </button>
                         </div>
                     </div>
                 </main>
@@ -208,46 +251,62 @@ export default function SellPage() {
     return (
         <>
             <Navbar />
-            <main className="relative min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-blue-950 dark:to-blue-900 text-black dark:text-gray-100">
-                <div className="fixed inset-0 -z-10 overflow-hidden opacity-10 dark:opacity-20">
-                    <div className="absolute inset-0 bg-[url('/logo.png')] bg-no-repeat bg-center bg-contain"></div>
-                </div>
+            <main className="relative min-h-screen bg-background text-foreground pb-24 overflow-hidden">
+                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[120px] pointer-events-none"></div>
 
-                <div className="container mx-auto px-4 py-12 max-w-3xl">
+                <div className="container mx-auto px-4 py-16 max-w-3xl relative z-10">
                     {/* Başlık */}
-                    <div className="text-center mb-12">
-                        <h1 className="text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">
+                    <div className="text-center mb-16">
+                        <h1 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight">
                             {t('title')}
                         </h1>
-                        <p className="text-lg text-gray-600 dark:text-gray-300">
+                        <p className="text-lg text-muted">
                             {t('subtitle')}
                         </p>
                     </div>
 
                     {/* Nasıl Çalışır */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
                         {[
                             { step: '1', title: t('step1Title'), desc: t('step1Desc') },
                             { step: '2', title: t('step2Title'), desc: t('step2Desc') },
                             { step: '3', title: t('step3Title'), desc: t('step3Desc') },
                         ].map(item => (
-                            <div key={item.step} className="bg-white/90 dark:bg-blue-900/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-blue-800 p-6 text-center">
-                                <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xl mx-auto mb-3">
+                            <div key={item.step} className="bg-surface rounded-xl border border-border p-6 text-center shadow-lg transition-transform hover:-translate-y-1">
+                                <div className="w-12 h-12 bg-accent/10 rounded-full flex items-center justify-center text-accent font-bold text-xl mx-auto mb-4 border border-accent/20">
                                     {item.step}
                                 </div>
-                                <h3 className="font-semibold text-lg mb-1">{item.title}</h3>
-                                <p className="text-sm text-gray-600 dark:text-gray-300">{item.desc}</p>
+                                <h3 className="font-semibold text-lg mb-2 text-foreground">{item.title}</h3>
+                                <p className="text-sm text-muted font-medium">{item.desc}</p>
                             </div>
                         ))}
                     </div>
 
                     {/* Satış Formu */}
-                    <div className="bg-white/90 dark:bg-blue-900/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-200 dark:border-blue-800 p-8">
+                    <div className="bg-surface rounded-2xl shadow-xl border border-border p-8">
                         <h2 className="text-2xl font-bold mb-6">{t('formTitle')}</h2>
 
                         {submitted && (
                             <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg text-green-600 dark:text-green-400">
                                 ✅ {t('submitSuccess')}
+                            </div>
+                        )}
+
+                        {depositInfo && (
+                            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-blue-700 dark:text-blue-300 space-y-2">
+                                {depositInfo.status === 'pending' && (
+                                    <>
+                                        <p className="font-semibold">📦 İlanınız yayına alınmadan önce item'ı bota emanet etmeniz gerekiyor.</p>
+                                        <p className="text-sm">Steam'de size gönderilen trade teklifini kabul edin, item bota ulaşınca ilan otomatik olarak aktif hale gelecek.</p>
+                                        <a href={depositInfo.tradeOfferUrl} target="_blank" rel="noopener noreferrer" className="inline-block mt-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg">
+                                            Trade Teklifini Steam'de Aç
+                                        </a>
+                                    </>
+                                )}
+                                {depositInfo.status === 'accepted' && <p className="font-semibold">✅ Item bota ulaştı, ilanınız artık pazarda görünüyor!</p>}
+                                {['declined', 'canceled', 'expired'].includes(depositInfo.status) && (
+                                    <p className="font-semibold">⚠️ Trade teklifi {depositInfo.status === 'declined' ? 'reddedildi' : depositInfo.status === 'expired' ? 'süresi doldu' : 'iptal edildi'}. Lütfen ilanı tekrar oluşturun.</p>
+                                )}
                             </div>
                         )}
 
@@ -408,7 +467,7 @@ export default function SellPage() {
                             <button
                                 type="submit"
                                 disabled={submitting}
-                                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-300 font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full bg-accent hover:bg-accentHover text-background py-4 rounded-xl transition-all duration-300 font-bold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed mt-4"
                             >
                                 {submitting ? t('submitting') : t('submit')}
                             </button>

@@ -8,7 +8,7 @@
 services:
   mongo:
     image: mongo:7
-    container_name: zade-mongo
+    container_name: loopskins-mongo
     restart: unless-stopped
     volumes:
       - mongo_data:/data/db
@@ -21,7 +21,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: zade-redis
+    container_name: loopskins-redis
     restart: unless-stopped
     healthcheck:
       test: redis-cli ping
@@ -34,7 +34,7 @@ services:
     build:
       context: ./backend
       target: prod
-    container_name: zade-backend
+    container_name: loopskins-backend
     restart: unless-stopped
     env_file:
       - ./backend/.env
@@ -59,7 +59,7 @@ services:
         NEXT_PUBLIC_SITE_URL: "http://localhost:${NGINX_PORT:-80}"
         # Sentry DSN gizli değildir; tanımsız bırakılırsa (varsayılan) Sentry devre dışı kalır.
         NEXT_PUBLIC_SENTRY_DSN: "${NEXT_PUBLIC_SENTRY_DSN:-}"
-    container_name: zade-frontend
+    container_name: loopskins-frontend
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -70,7 +70,7 @@ services:
 
   nginx:
     image: nginx:alpine
-    container_name: zade-nginx
+    container_name: loopskins-nginx
     restart: unless-stopped
     ports:
       - "${NGINX_PORT:-80}:80"

@@ -8,7 +8,7 @@
 services:
   mongo:
     image: mongo:7
-    container_name: zade-mongo
+    container_name: loopskins-mongo
     restart: unless-stopped
     ports:
       - "27017:27017"
@@ -23,7 +23,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: zade-redis
+    container_name: loopskins-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
@@ -38,7 +38,7 @@ services:
     build:
       context: ./backend
       target: dev
-    container_name: zade-backend
+    container_name: loopskins-backend
     restart: unless-stopped
     env_file:
       - ./backend/.env
@@ -64,7 +64,7 @@ services:
     build:
       context: ./frontend
       target: dev
-    container_name: zade-frontend
+    container_name: loopskins-frontend
     restart: unless-stopped
     env_file:
       - path: ./frontend/.env
@@ -89,7 +89,7 @@ services:
 
   nginx:
     image: nginx:alpine
-    container_name: zade-nginx
+    container_name: loopskins-nginx
     restart: unless-stopped
     ports:
       - "${NGINX_PORT:-8080}:80"

@@ -26,14 +26,29 @@ const Navbar = () => {
   const [showResults, setShowResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, login } = useAuth();
   const router = useRouter();
   const [balance, setBalance] = useState<number | null>(null);
+  const [showNavbar, setShowNavbar] = useState(true);
 
   useEffect(() => {
-    const systemTheme = getSystemTheme();
-    setTheme(systemTheme);
-    document.documentElement.classList.toggle('dark', systemTheme === 'dark');
+    let lastScrollY = window.scrollY;
+
+    const handleScroll = () => {
+      if (window.scrollY > lastScrollY && window.scrollY > 80) {
+        setShowNavbar(false);
+      } else {
+        setShowNavbar(true);
+      }
+      lastScrollY = window.scrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+  
+  useEffect(() => {
+    document.documentElement.classList.add('dark');
   }, []);
 
   useEffect(() => {
@@ -93,23 +108,48 @@ const Navbar = () => {
     router.push('/');
   };
 
+  const handleSteamLogin = () => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    // apiBaseUrl boş olabilir (Nginx reverse proxy arkasında relative path) — bu durumda backend
+    // aynı origin'de sayılır, popup'ın postMessage origin'i sayfanın kendi origin'i olur.
+    const expectedOrigin = new URL(apiBaseUrl || '/', window.location.origin).origin;
+
+    const width = 600;
+    const height = 800;
+    const left = window.innerWidth / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    window.open(
+      `${apiBaseUrl}/api/auth/steam`,
+      'SteamLogin',
+      `width=${width},height=${height},top=${top},left=${left}`
+    );
+
+    const messageListener = (event: MessageEvent) => {
+      if (event.origin !== expectedOrigin) return;
+      if (event.data?.type === 'STEAM_LOGIN_SUCCESS' && event.data.token) {
+        login(event.data.token);
+        window.removeEventListener('message', messageListener);
+      }
+    };
+    window.addEventListener('message', messageListener);
+  };
+
   const otherLocale = routing.locales.find((l) => l !== locale) ?? locale;
 
   return (
-    <nav className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md shadow-lg sticky top-0 z-50">
+    <nav className={`fixed w-full top-0 z-50 transition-transform duration-300 ${showNavbar ? 'translate-y-0' : '-translate-y-full'}`} style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between h-16 items-center">
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-2 group">
-              <div className="animate-spin-slow group-hover:animate-spin-fast transition-all duration-300">
-                <img
-                  src="/logo.png"
-                  alt="Zade Logo"
-                  className="h-12 w-12 object-contain transition-all duration-300 group-hover:scale-110 dark:brightness-0 dark:invert dark:opacity-90 dark:filter dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]"
-                />
+              <div className="transition-all duration-300 group-hover:opacity-80">
+                {/* Geçici bir ikon kullanabiliriz ya da logo.png kalabilir */}
+                <div className="h-8 w-8 bg-accent text-surface flex items-center justify-center rounded-md font-bold text-xl">L</div>
               </div>
-              <span className="text-xl font-bold bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent group-hover:from-indigo-600 group-hover:via-purple-600 group-hover:to-pink-600 transition-all duration-300">Zade</span>
+              <span className="text-xl font-bold text-foreground group-hover:text-accent tracking-tight transition-colors duration-200">
+                LoopSkins
+              </span>
             </Link>
           </div>
 
@@ -117,76 +157,41 @@ const Navbar = () => {
           <div className="hidden md:flex items-center space-x-8">
             <Link
               href="/"
-              className="relative text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 font-medium group"
+              className="relative text-white/50 hover:text-white/90 text-sm font-medium group transition-colors duration-200"
+              style={{ fontFamily: "'Inter','Helvetica Neue',sans-serif" }}
             >
               {t('home')}
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 group-hover:w-full transition-all duration-300"></span>
+              <span className="absolute -bottom-1 left-0 w-0 h-px bg-white/60 group-hover:w-full transition-all duration-300"></span>
             </Link>
             <Link
               href="/cs2-skin"
-              className="relative text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 font-medium group"
+              className="relative text-white/50 hover:text-white/90 text-sm font-medium group transition-colors duration-200"
+              style={{ fontFamily: "'Inter','Helvetica Neue',sans-serif" }}
             >
               {t('cs2Skin')}
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 group-hover:w-full transition-all duration-300"></span>
+              <span className="absolute -bottom-1 left-0 w-0 h-px bg-white/60 group-hover:w-full transition-all duration-300"></span>
             </Link>
             <Link
               href="/market"
-              className="relative text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 font-medium group"
+              className="relative text-white/50 hover:text-white/90 text-sm font-medium group transition-colors duration-200"
+              style={{ fontFamily: "'Inter','Helvetica Neue',sans-serif" }}
             >
               {t('market')}
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 group-hover:w-full transition-all duration-300"></span>
+              <span className="absolute -bottom-1 left-0 w-0 h-px bg-white/60 group-hover:w-full transition-all duration-300"></span>
             </Link>
             <Link
               href="/sell"
-              className="relative text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 font-medium group"
+              className="relative text-white/50 hover:text-white/90 text-sm font-medium group transition-colors duration-200"
+              style={{ fontFamily: "'Inter','Helvetica Neue',sans-serif" }}
             >
               {t('sell')}
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 group-hover:w-full transition-all duration-300"></span>
+              <span className="absolute -bottom-1 left-0 w-0 h-px bg-white/60 group-hover:w-full transition-all duration-300"></span>
             </Link>
           </div>
 
           {/* Sağ Menü */}
           <div className="hidden md:flex items-center space-x-4">
-            {/* Arama */}
-            <div className="relative flex items-center" ref={searchRef}>
-              <input
-                type="text"
-                placeholder={t('searchPlaceholder')}
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-                onFocus={() => searchResults.length > 0 && setShowResults(true)}
-                className="w-64 px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:border-blue-500 text-black dark:text-white dark:bg-gray-800 placeholder-gray-500 dark:placeholder-gray-400 pr-10 transition-all duration-300"
-              />
-              <button className="absolute right-3 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-500 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                </svg>
-              </button>
-
-              {/* Arama Sonuçları Dropdown */}
-              {showResults && searchResults.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-80 overflow-y-auto z-50">
-                  {searchResults.map((skin: any, index: number) => (
-                    <Link
-                      key={skin.id || index}
-                      href={`/cs2/skins/${skin.category}/${skin.weapon?.toLowerCase().replace(/[^a-z0-9]/g, '-')}/${skin.id}`}
-                      className="flex items-center px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-700 last:border-0"
-                      onClick={() => { setShowResults(false); setSearchQuery(''); }}
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{skin.weapon} | {skin.name}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{skin.rarity}</p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-              {showResults && searchQuery.length >= 2 && searchResults.length === 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-4 text-center text-gray-500 dark:text-gray-400 text-sm z-50">
-                  {t('noResults')}
-                </div>
-              )}
-            </div>
+            {/* Arama kaldırıldı */}
 
             {/* Auth Butonları */}
             {isAuthenticated && user ? (
@@ -194,21 +199,24 @@ const Navbar = () => {
                 <NotificationBell />
                 <Link
                   href="/wallet"
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full text-sm font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-sm"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200"
+                  style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.8)' }}
                   title={t('wallet')}
                 >
                   💰 {balance !== null ? formatBalance(balance) : '...'}
                 </Link>
                 <Link
                   href="/profile"
-                  className="text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors"
+                  className="text-sm font-medium transition-colors duration-200"
+                  style={{ color: 'rgba(255,255,255,0.6)' }}
                 >
                   {user.username}
                 </Link>
                 {user.role === 'admin' && (
                   <Link
                     href="/admin"
-                    className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 font-medium transition-colors text-sm"
+                    className="text-sm font-medium transition-colors duration-200"
+                    style={{ color: 'rgba(255,255,255,0.5)' }}
                     title={t('adminMobile')}
                   >
                     🛠️ {t('admin')}
@@ -216,25 +224,21 @@ const Navbar = () => {
                 )}
                 <button
                   onClick={handleLogout}
-                  className="text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 font-medium transition-colors text-sm"
+                  className="text-sm font-medium transition-colors duration-200"
+                  style={{ color: 'rgba(255,255,255,0.35)' }}
                 >
                   {t('logout')}
                 </button>
               </div>
             ) : (
               <>
-                <Link
-                  href="/login"
-                  className="text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors"
-                >
-                  {t('login')}
-                </Link>
-                <Link
-                  href="/register"
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-300 font-medium shadow-md hover:shadow-lg"
-                >
-                  {t('register')}
-                </Link>
+              <button
+                onClick={handleSteamLogin}
+                className="text-sm font-bold px-4 py-2 rounded-md transition-all duration-300 bg-[#171a21] hover:bg-[#2a475e] text-white flex items-center gap-2 shadow-lg"
+              >
+                <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="Steam" className="w-5 h-5 brightness-0 invert" />
+                Steam ile Giriş Yap
+              </button>
               </>
             )}
 
@@ -242,29 +246,14 @@ const Navbar = () => {
             <Link
               href={pathname}
               locale={otherLocale}
-              className="ml-2 px-2.5 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 shadow-sm text-xs font-bold uppercase text-gray-700 dark:text-gray-200"
+              className="px-2.5 py-1.5 rounded-md text-xs font-medium uppercase tracking-wider transition-all duration-200 hover:bg-white/10"
+              style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)', fontFamily: "'Courier New',monospace" }}
               aria-label={t('language')}
               title={t('language')}
             >
               {otherLocale}
             </Link>
 
-            {/* Tema Butonu */}
-            <button
-              onClick={toggleTheme}
-              className="ml-2 p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 shadow-md hover:shadow-lg"
-              aria-label={t('toggleTheme')}
-            >
-              {theme === 'light' ? (
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-yellow-500">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m0 13.5V21m8.25-9H21M3 12H4.75m15.364 6.364l-1.591-1.591M6.227 6.227l-1.591-1.591m12.728 0l-1.591 1.591M6.227 17.773l-1.591 1.591M12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9z" />
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-gray-200">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z" />
-                </svg>
-              )}
-            </button>
           </div>
 
           {/* Mobil Menü Butonu */}
@@ -283,107 +272,49 @@ const Navbar = () => {
 
       {/* Mobil Menü */}
       {isMenuOpen && (
-        <div className="md:hidden bg-white dark:bg-gray-900 shadow-lg">
+        <div className="md:hidden shadow-lg" style={{ background: '#0a0a0a', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
           <div className="pt-2 pb-3 space-y-1">
-            <Link
-              href="/"
-              className="block pl-3 pr-4 py-2 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            >
-              {t('home')}
-            </Link>
-            <Link
-              href="/cs2-skin"
-              className="block pl-3 pr-4 py-2 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            >
-              {t('cs2Skin')}
-            </Link>
-            <Link
-              href="/market"
-              className="block pl-3 pr-4 py-2 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            >
-              {t('market')}
-            </Link>
-            <Link
-              href="/sell"
-              className="block pl-3 pr-4 py-2 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            >
-              {t('sell')}
-            </Link>
-            <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
+            <Link href="/" className="block pl-4 pr-4 py-3 text-sm font-medium transition-colors" style={{ color: 'rgba(255,255,255,0.6)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>{t('home')}</Link>
+            <Link href="/cs2-skin" className="block pl-4 pr-4 py-3 text-sm font-medium transition-colors" style={{ color: 'rgba(255,255,255,0.6)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>{t('cs2Skin')}</Link>
+            <Link href="/market" className="block pl-4 pr-4 py-3 text-sm font-medium transition-colors" style={{ color: 'rgba(255,255,255,0.6)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>{t('market')}</Link>
+            <Link href="/sell" className="block pl-4 pr-4 py-3 text-sm font-medium transition-colors" style={{ color: 'rgba(255,255,255,0.6)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>{t('sell')}</Link>
+            <div className="my-1" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}></div>
 
             {isAuthenticated && user ? (
               <>
                 <NotificationBell variant="mobile" />
-                <Link
-                  href="/wallet"
-                  className="block pl-3 pr-4 py-2 text-base font-medium text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
+                <Link href="/wallet" className="block pl-4 pr-4 py-3 text-sm font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}>
                   💰 {t('walletMobile')} {balance !== null ? `(${formatBalance(balance)})` : ''}
                 </Link>
-                <Link
-                  href="/profile"
-                  className="block pl-3 pr-4 py-2 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
-                  {user.username}
-                </Link>
+                <Link href="/profile" className="block pl-4 pr-4 py-3 text-sm font-medium" style={{ color: 'rgba(255,255,255,0.6)' }}>{user.username}</Link>
                 {user.role === 'admin' && (
-                  <Link
-                    href="/admin"
-                    className="block pl-3 pr-4 py-2 text-base font-medium text-purple-600 dark:text-purple-400 hover:bg-gray-50 dark:hover:bg-gray-800"
-                  >
-                    🛠️ {t('adminMobile')}
-                  </Link>
+                  <Link href="/admin" className="block pl-4 pr-4 py-3 text-sm font-medium" style={{ color: 'rgba(255,255,255,0.5)' }}>🛠️ {t('adminMobile')}</Link>
                 )}
-                <button
-                  onClick={handleLogout}
-                  className="block w-full text-left pl-3 pr-4 py-2 text-base font-medium text-red-500 hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
+                <button onClick={handleLogout} className="block w-full text-left pl-4 pr-4 py-3 text-sm font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>
                   {t('logoutMobile')}
                 </button>
               </>
             ) : (
               <>
-                <Link
-                  href="/login"
-                  className="block pl-3 pr-4 py-2 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                >
-                  {t('login')}
-                </Link>
-                <Link
-                  href="/register"
-                  className="block pl-3 pr-4 py-2 text-base font-medium bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 transition-all duration-300"
-                >
-                  {t('register')}
-                </Link>
+                <button onClick={handleSteamLogin} className="flex items-center gap-2 pl-4 pr-4 py-3 text-sm font-bold transition-colors bg-[#171a21] hover:bg-[#2a475e] text-white border-b border-white/5 w-full text-left">
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg" alt="Steam" className="w-5 h-5 brightness-0 invert" />
+                  Steam ile Giriş Yap
+                </button>
               </>
             )}
 
             {/* Dil Değiştirici Mobil */}
-            <Link
-              href={pathname}
-              locale={otherLocale}
-              className="ml-3 mt-2 px-2.5 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300 text-xs font-bold uppercase text-gray-700 dark:text-gray-200"
-              aria-label={t('language')}
-            >
-              {otherLocale}
-            </Link>
-
-            {/* Tema Butonu Mobil */}
-            <button
-              onClick={toggleTheme}
-              className="ml-3 mt-2 p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300"
-              aria-label={t('toggleTheme')}
-            >
-              {theme === 'light' ? (
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-yellow-500">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m0 13.5V21m8.25-9H21M3 12H4.75m15.364 6.364l-1.591-1.591M6.227 6.227l-1.591-1.591m12.728 0l-1.591 1.591M6.227 17.773l-1.591 1.591M12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9z" />
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-gray-200">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z" />
-                </svg>
-              )}
-            </button>
+            <div className="flex items-center gap-2 px-4 py-3">
+              <Link
+                href={pathname}
+                locale={otherLocale}
+                className="px-2.5 py-1.5 rounded-md text-xs font-medium uppercase tracking-wider transition-all duration-200"
+                style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)' }}
+                aria-label={t('language')}
+              >
+                {otherLocale}
+              </Link>
+            </div>
           </div>
         </div>
       )}

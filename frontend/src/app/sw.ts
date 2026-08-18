@@ -38,10 +38,10 @@ self.addEventListener('push', (event) => {
   try {
     data = event.data ? event.data.json() : {};
   } catch {
-    data = { title: 'Zade', body: event.data?.text() || '' };
+    data = { title: 'LoopSkins', body: event.data?.text() || '' };
   }
 
-  const title = data.title || 'Zade';
+  const title = data.title || 'LoopSkins';
   const options: NotificationOptions = {
     body: data.body || '',
     icon: '/icons/icon-192.png',
