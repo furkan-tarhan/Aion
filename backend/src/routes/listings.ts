@@ -339,7 +339,7 @@ router.post('/', authenticateToken, async (req, res) => {
         rarity: 'Mil-Spec', // Skin.rarity enum'unda "Grade" son eki yok — envanterden gelen item'ın gerçek rarity'si bilinmiyor
         description: `${marketHashName} cs2 skin`,
         image: iconUrl || '',
-        price: { min: price, max: price, currency: 'TRY' } // İlk ilanın fiyatını başlangıç referansı olarak kullan
+        price: { min: price, max: price, currency: 'USD' } // İlk ilanın fiyatını başlangıç referansı olarak kullan
       });
       await skin.save();
     } else if (!skin) {
@@ -360,7 +360,7 @@ router.post('/', authenticateToken, async (req, res) => {
       rarity: skin.rarity,
       title: marketHashName || `${skin.weapon} | ${skin.name}`,
       price,
-      currency: 'TRY', // LoopSkins TRY kullanıyor
+      currency: 'USD', // LoopSkins kripto ödeme USD üzerinden hesaplanır
       steamTradeUrl,
       status: willAutoDeposit ? 'pending_deposit' : 'active',
       wear: wear || undefined,
@@ -585,21 +585,21 @@ router.post('/:id/buy', authenticateToken, async (req, res) => {
         user: buyerId,
         type: 'purchase',
         title: 'Satın Alma Başarılı',
-        message: `${claimedListing.title} ürününü ${claimedListing.price} TL karşılığında satın aldınız.`,
+        message: `${claimedListing.title} ürününü ${claimedListing.price} USD karşılığında satın aldınız.`,
         relatedListing: claimedListing._id.toString()
       });
       await createNotification({
         user: claimedListing.seller.toString(),
         type: 'sale',
         title: 'Ürününüz Satıldı',
-        message: `${claimedListing.title} ürününüz ${claimedListing.price} TL karşılığında satıldı.`,
+        message: `${claimedListing.title} ürününüz ${claimedListing.price} USD karşılığında satıldı.`,
         relatedListing: claimedListing._id.toString()
       });
       if (seller?.email) {
         await sendCriticalEmail(
           seller.email,
           'Ürününüz Satıldı',
-          `<p><strong>${claimedListing.title}</strong> ürününüz <strong>${claimedListing.price} TL</strong> karşılığında satıldı.</p><p>Güncel bakiyeniz: ${seller.balance} TL</p>`
+          `<p><strong>${claimedListing.title}</strong> ürününüz <strong>${claimedListing.price} USD</strong> karşılığında satıldı.</p><p>Güncel bakiyeniz: ${seller.balance} USD</p>`
         );
       }
     } catch (notifyError) {

@@ -43,9 +43,9 @@ EMAIL_PASS=<gmail-app-password>
 FRONTEND_URL=http://localhost:3000
 BACKEND_URL=http://localhost:5000
 STEAM_API_KEY=<steam-api-key>
-IYZICO_API_KEY=<iyzico-sandbox-api-key>
-IYZICO_SECRET_KEY=<iyzico-sandbox-secret-key>
-IYZICO_BASE_URL=https://sandbox-api.iyzipay.com
+CRYPTOMUS_MERCHANT_ID=<cryptomus-merchant-id>
+CRYPTOMUS_PAYMENT_API_KEY=<cryptomus-payment-api-key>
+CRYPTOMUS_BASE_URL=https://api.cryptomus.com/v1
 ADMIN_EMAILS=admin@ornek.com
 
 # Opsiyonel — tanımlı değilse Steam trade botu devre dışı kalır, ilan/satın alma manuel akışa düşer
@@ -60,7 +60,7 @@ STEAM_BOT_IDENTITY_SECRET=
 > **Not:** `STEAM_BOT_*` dördü de doldurulursa marketplace, satıcının item'ını otomatik emanete alıp satın alma sonrası alıcıya otomatik teslim eden bir Steam bot çalıştırır (bkz. `backend/.env.example`'daki detaylı açıklama ve `docs/PROJECT_STATUS.md`). Bu, marketplace'e ait ayrı bir Steam hesabı ve o hesapta etkin Steam Guard Mobile Authenticator gerektirir — kişisel hesabınla kullanma.
 
 > **Not:** `JWT_SECRET` için `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` kullanabilirsin.
-> **Not:** iyzico sandbox API bilgilerini almak için `backend/API_SETUP.md` içindeki "iyzico Sandbox Kurulumu" bölümüne bakabilirsin. Para çekme talepleri şu an otomatik değil — bakiye anında düşülür ama transfer manuel/banka tarafında yapılması beklenir.
+> **Not:** Cryptomus merchant/API bilgilerini almak için `backend/API_SETUP.md` içindeki "Cryptomus Hesap Kurulumu" bölümüne bakabilirsin. Para çekme talepleri şu an otomatik değil — bakiye anında düşülür ama coin transferi admin tarafından manuel gönderilmesi beklenir.
 
 Production'a deploy ederken `frontend`'de `NEXT_PUBLIC_SITE_URL` ortam değişkenini gerçek domain'e ayarla (örn. `https://loopskins.com`) — `sitemap.xml`, `robots.txt` ve Open Graph URL'leri bu değeri kullanır. Ayarlanmazsa `http://localhost:3000`'e düşer.
 
@@ -91,7 +91,7 @@ cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 ```
 
-`backend/.env` içindeki secret'ları (JWT_SECRET, EMAIL_*, STEAM_API_KEY, IYZICO_*, ADMIN_EMAILS) doldur. `frontend/.env` dosyasındaki değerler Docker ortamında `docker-compose*.yml` tarafından otomatik override edilir, boş bırakılabilir.
+`backend/.env` içindeki secret'ları (JWT_SECRET, EMAIL_*, STEAM_API_KEY, CRYPTOMUS_*, ADMIN_EMAILS) doldur. `frontend/.env` dosyasındaki değerler Docker ortamında `docker-compose*.yml` tarafından otomatik override edilir, boş bırakılabilir.
 
 ### 2. Geliştirme ortamı (hot-reload)
 
@@ -210,14 +210,16 @@ LoopSkins/
 ├── backend/
 │   ├── src/
 │   │   ├── config.ts          # Merkezi konfigürasyon
-│   │   ├── index.ts           # Express app + rate limiting
+│   │   ├── app.ts             # Express app kurulumu (middleware + route mount) — testler bunu import eder
+│   │   ├── index.ts           # Bootstrap: mongo connect + Steam bot + app.listen()
+│   │   ├── __tests__/         # Jest + Supertest + mongodb-memory-server (npm test)
 │   │   ├── logger.ts          # Pino logger (console + günlük rotasyonlu dosya)
 │   │   ├── swagger.ts         # OpenAPI spec (swagger-jsdoc, route dosyalarındaki @swagger yorumlarından üretilir)
 │   │   ├── lib/redis.ts       # Redis client (REDIS_URL yoksa null → in-memory fallback)
 │   │   ├── middleware/requestLogger.ts # pino-http HTTP istek loglama
 │   │   ├── models/User.ts     # Mongoose User modeli (balance dahil)
 │   │   ├── models/Transaction.ts # Cüzdan işlem kayıtları (deposit/withdrawal/purchase/sale)
-│   │   ├── services/iyzico.ts # iyzico Checkout Form entegrasyonu
+│   │   ├── services/cryptomus.ts # Cryptomus kripto ödeme entegrasyonu (invoice + webhook doğrulama)
 │   │   └── routes/
 │   │       ├── users.ts       # Auth + CRUD + email doğrulama
 │   │       ├── skins.ts       # Skin verileri + arama
@@ -268,7 +270,7 @@ LoopSkins/
 - 🎯 Input validation (email, şifre, username)
 - 📧 Email doğrulama + şifre sıfırlama
 - 💰 Steam Market fiyat entegrasyonu
-- 👛 Cüzdan / bakiye sistemi (iyzico ile para yatırma, bakiyeyle satın alma)
+- 👛 Cüzdan / bakiye sistemi (Cryptomus ile kripto para yatırma, bakiyeyle satın alma)
 - 🤖 Steam trade bot: emanet modeliyle otomatik ilan-teslim akışı (`STEAM_BOT_*` opsiyonel, izole child process'te çalışır)
 - 🔔 Bildirim sistemi (satış/alım, para yatırma/çekme, değerlendirme — in-app + kritik email)
 - 📈 Fiyat geçmişi grafikleri (platform satışları + Steam anlık fiyat referansı, Chart.js)
@@ -327,7 +329,7 @@ LoopSkins/
 - [x] **Veritabanı Skin Modeli** — MongoDB Skin modeli + seed script tamamlandı (51 skin)
 - [x] **Market Sayfası Backend Entegrasyonu** — Market sayfası backend API'den veri çekiyor (filtre + sıralama + pagination)
 - [x] **Satış Sayfası Backend Entegrasyonu** — Sell formu backend'e POST `/api/listings` ile bağlandı (skin arama + ilan oluşturma)
-- [x] **Ödeme / Bakiye Sistemi** — iyzico Checkout Form (sandbox) ile para yatırma, cüzdan bakiyesiyle satın alma, para çekme talebi *(tamamlandı)*
+- [x] **Ödeme / Bakiye Sistemi** — Cryptomus ile kripto para yatırma (invoice + webhook), cüzdan bakiyesiyle satın alma, kripto çekme talebi *(tamamlandı)*
 - [x] **Sipariş / İşlem (Transaction) Sistemi** — Deposit/withdrawal/purchase/sale işlem geçmişi (`Transaction` modeli + `/api/wallet/transactions`) *(tamamlandı)*
 - [x] **Next.js 15 `params` TypeScript Hatası** — Tüm dynamic route sayfalarında `Promise` + `use()` ile düzeltildi
 

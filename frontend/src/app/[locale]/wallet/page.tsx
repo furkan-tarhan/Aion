@@ -32,17 +32,20 @@ export default function WalletPage() {
 
     // Para yatırma formu
     const [amount, setAmount] = useState('');
-    const [name, setName] = useState('');
-    const [surname, setSurname] = useState('');
-    const [identityNumber, setIdentityNumber] = useState('');
-    const [phone, setPhone] = useState('');
-    const [address, setAddress] = useState('');
-    const [city, setCity] = useState('');
     const [depositSubmitting, setDepositSubmitting] = useState(false);
 
     // Para çekme formu
+    const NETWORKS = [
+        { value: 'USDT_TRC20', label: 'USDT (TRC20)' },
+        { value: 'USDT_BEP20', label: 'USDT (BEP20)' },
+        { value: 'USDT_ERC20', label: 'USDT (ERC20)' },
+        { value: 'BTC', label: 'Bitcoin (BTC)' },
+        { value: 'ETH', label: 'Ethereum (ETH)' },
+        { value: 'TON', label: 'Toncoin (TON)' },
+    ];
     const [withdrawAmount, setWithdrawAmount] = useState('');
-    const [iban, setIban] = useState('');
+    const [walletAddress, setWalletAddress] = useState('');
+    const [network, setNetwork] = useState(NETWORKS[0].value);
     const [withdrawSubmitting, setWithdrawSubmitting] = useState(false);
 
     const loadWallet = async () => {
@@ -62,17 +65,35 @@ export default function WalletPage() {
         if (!isAuthenticated) return;
         loadWallet();
 
-        // Deposit callback sonucu: /wallet?deposit=success|failed
+        // Cryptomus ödeme sayfasından dönüş: /wallet?deposit=pending
+        // Gerçek bakiye artışı webhook ile async olarak işlenir, bu yüzden burada birkaç kez
+        // cüzdanı yeniden çekip webhook'un yetişmesini bekliyoruz (bkz. /sell sayfasındaki deposit
+        // banner poll deseni).
         const params = new URLSearchParams(window.location.search);
         const depositResult = params.get('deposit');
-        if (depositResult === 'success') {
-            setMessage({ text: `${t('depositSuccess')} 🎉`, type: 'success' });
-        } else if (depositResult === 'failed') {
-            setMessage({ text: t('depositFailed'), type: 'error' });
-        }
-        if (depositResult) {
+        if (depositResult === 'pending') {
+            setMessage({ text: t('depositPending'), type: 'pending' });
             window.history.replaceState({}, '', '/wallet');
-            setTimeout(() => setMessage({ text: '', type: '' }), 6000);
+
+            let attempts = 0;
+            const poll = setInterval(async () => {
+                attempts += 1;
+                const data = await walletApi.getWallet().catch(() => null);
+                const latest = data?.data?.recentTransactions?.[0];
+                if (latest?.type === 'deposit' && latest.status === 'completed') {
+                    setBalance(data!.data.balance);
+                    setTransactions(data!.data.recentTransactions);
+                    setMessage({ text: `${t('depositSuccess')} 🎉`, type: 'success' });
+                    clearInterval(poll);
+                    setTimeout(() => setMessage({ text: '', type: '' }), 6000);
+                } else if (latest?.type === 'deposit' && latest.status === 'failed') {
+                    setMessage({ text: t('depositFailed'), type: 'error' });
+                    clearInterval(poll);
+                } else if (attempts >= 10) {
+                    clearInterval(poll);
+                }
+            }, 3000);
+            return () => clearInterval(poll);
         }
     }, [isAuthenticated]);
 
@@ -80,24 +101,14 @@ export default function WalletPage() {
         e.preventDefault();
         setMessage({ text: '', type: '' });
 
-        if (!amount || Number(amount) < 10) {
+        if (!amount || Number(amount) < 5) {
             setMessage({ text: t('minDepositAmount'), type: 'error' });
-            return;
-        }
-        if (!name || !surname || !phone || !address || !city) {
-            setMessage({ text: t('fillAllFields'), type: 'error' });
-            return;
-        }
-        if (!/^\d{11}$/.test(identityNumber)) {
-            setMessage({ text: t('invalidIdentityNumber'), type: 'error' });
             return;
         }
 
         try {
             setDepositSubmitting(true);
-            const res = await walletApi.deposit({
-                amount: Number(amount), name, surname, identityNumber, phone, address, city,
-            });
+            const res = await walletApi.deposit({ amount: Number(amount) });
             if (res.success && res.data.paymentPageUrl) {
                 window.location.href = res.data.paymentPageUrl;
             } else {
@@ -114,22 +125,22 @@ export default function WalletPage() {
         e.preventDefault();
         setMessage({ text: '', type: '' });
 
-        if (!withdrawAmount || Number(withdrawAmount) < 50) {
+        if (!withdrawAmount || Number(withdrawAmount) < 10) {
             setMessage({ text: t('minWithdrawAmount'), type: 'error' });
             return;
         }
-        if (!iban || iban.replace(/\s/g, '').length < 15) {
-            setMessage({ text: t('invalidIban'), type: 'error' });
+        if (!walletAddress || walletAddress.trim().length < 10) {
+            setMessage({ text: t('invalidWalletAddress'), type: 'error' });
             return;
         }
 
         try {
             setWithdrawSubmitting(true);
-            const res = await walletApi.withdraw({ amount: Number(withdrawAmount), iban });
+            const res = await walletApi.withdraw({ amount: Number(withdrawAmount), walletAddress, network });
             setMessage({ text: res.message, type: 'success' });
             setBalance(res.data.balance);
             setWithdrawAmount('');
-            setIban('');
+            setWalletAddress('');
             loadWallet();
         } catch (err: any) {
             setMessage({ text: err.message || t('withdrawRequestError'), type: 'error' });
@@ -139,14 +150,14 @@ export default function WalletPage() {
     };
 
     const formatMoney = (value: number) =>
-        new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(value);
+        new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 
     const handleTestDeposit = async () => {
         try {
             setMessage({ text: '', type: '' });
-            const res = await walletApi.testDeposit(1000); // 1000 TRY test bakiyesi
+            const res = await walletApi.testDeposit(1000); // 1000 USD test bakiyesi
             if (res.success) {
-                setMessage({ text: '1000 TRY Test Bakiyesi Eklendi!', type: 'success' });
+                setMessage({ text: '1000 USD Test Bakiyesi Eklendi!', type: 'success' });
                 setBalance(res.balance);
                 loadWallet();
             }
@@ -213,9 +224,11 @@ export default function WalletPage() {
                     {message.text && (
                         <div className={`mb-6 p-4 rounded-lg ${message.type === 'success'
                             ? 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400'
-                            : 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400'
+                            : message.type === 'pending'
+                                ? 'bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 text-yellow-700 dark:text-yellow-400'
+                                : 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400'
                             }`}>
-                            {message.type === 'success' ? '✅' : '❌'} {message.text}
+                            {message.type === 'success' ? '✅' : message.type === 'pending' ? '⏳' : '❌'} {message.text}
                         </div>
                     )}
 
@@ -252,14 +265,14 @@ export default function WalletPage() {
                                         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 p-4 rounded-xl flex items-center justify-between mb-8 shadow-sm">
                                             <div>
                                                 <h3 className="text-yellow-800 dark:text-yellow-400 font-bold mb-1">Geliştirici Testi</h3>
-                                                <p className="text-yellow-700/80 dark:text-yellow-500/80 text-sm">Ödeme altyapısını atlayarak anında 1000 TRY test bakiyesi yükleyebilirsiniz.</p>
+                                                <p className="text-yellow-700/80 dark:text-yellow-500/80 text-sm">Ödeme altyapısını atlayarak anında 1000 USD test bakiyesi yükleyebilirsiniz.</p>
                                             </div>
                                             <button
                                                 type="button"
                                                 onClick={handleTestDeposit}
                                                 className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors shadow-md whitespace-nowrap"
                                             >
-                                                +1000 TRY Test Ekle
+                                                +1000 USD Test Ekle
                                             </button>
                                         </div>
                                     )}
@@ -270,50 +283,11 @@ export default function WalletPage() {
                                     </p>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{t('amountLabel')}</label>
-                                        <input type="number" min="10" step="0.01" value={amount} onChange={e => setAmount(e.target.value)}
-                                            placeholder="100.00"
+                                        <input type="number" min="5" step="0.01" value={amount} onChange={e => setAmount(e.target.value)}
+                                            placeholder="50.00"
                                             className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black dark:text-white dark:bg-gray-800 placeholder-gray-400" />
                                     </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{t('nameLabel')}</label>
-                                            <input type="text" value={name} onChange={e => setName(e.target.value)}
-                                                className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black dark:text-white dark:bg-gray-800" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{t('surnameLabel')}</label>
-                                            <input type="text" value={surname} onChange={e => setSurname(e.target.value)}
-                                                className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black dark:text-white dark:bg-gray-800" />
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{t('identityNumberLabel')}</label>
-                                            <input type="text" value={identityNumber} onChange={e => setIdentityNumber(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                                                placeholder={t('identityNumberPlaceholder')}
-                                                className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black dark:text-white dark:bg-gray-800 placeholder-gray-400" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{t('phoneLabel')}</label>
-                                            <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
-                                                placeholder="+90 5XX XXX XX XX"
-                                                className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black dark:text-white dark:bg-gray-800 placeholder-gray-400" />
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{t('cityLabel')}</label>
-                                            <input type="text" value={city} onChange={e => setCity(e.target.value)}
-                                                placeholder="İstanbul"
-                                                className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black dark:text-white dark:bg-gray-800 placeholder-gray-400" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{t('addressLabel')}</label>
-                                            <input type="text" value={address} onChange={e => setAddress(e.target.value)}
-                                                placeholder={t('addressPlaceholder')}
-                                                className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black dark:text-white dark:bg-gray-800 placeholder-gray-400" />
-                                        </div>
-                                    </div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">{t('depositCryptoNote')}</p>
                                     <button type="submit" disabled={depositSubmitting}
                                         className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-300 font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
                                         {depositSubmitting ? t('redirecting') : t('goToPaymentPage')}
@@ -329,14 +303,21 @@ export default function WalletPage() {
                                     </p>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{t('amountLabel')}</label>
-                                        <input type="number" min="50" step="0.01" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)}
-                                            placeholder="100.00"
+                                        <input type="number" min="10" step="0.01" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)}
+                                            placeholder="50.00"
                                             className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black dark:text-white dark:bg-gray-800 placeholder-gray-400" />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">IBAN</label>
-                                        <input type="text" value={iban} onChange={e => setIban(e.target.value.toUpperCase())}
-                                            placeholder="TR00 0000 0000 0000 0000 0000 00"
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{t('networkLabel')}</label>
+                                        <select value={network} onChange={e => setNetwork(e.target.value)}
+                                            className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black dark:text-white dark:bg-gray-800">
+                                            {NETWORKS.map(n => <option key={n.value} value={n.value}>{n.label}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{t('walletAddressLabel')}</label>
+                                        <input type="text" value={walletAddress} onChange={e => setWalletAddress(e.target.value.trim())}
+                                            placeholder={t('walletAddressPlaceholder')}
                                             className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black dark:text-white dark:bg-gray-800 placeholder-gray-400" />
                                     </div>
                                     <button type="submit" disabled={withdrawSubmitting}

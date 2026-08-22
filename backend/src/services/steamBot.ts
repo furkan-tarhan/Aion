@@ -1,7 +1,7 @@
 // Steam trade bot'unu (bkz. bot/steamBotProcess.ts) izole bir child process olarak yönetir.
 // Bot process'ine sadece STEAM_BOT_* env değişkenleri aktarılır — bu process'in (ve onun
 // güvenlik açığı barındıran steamcommunity/steam-tradeoffer-manager bağımlılık zincirinin)
-// MongoDB, JWT_SECRET veya iyzico sırlarına erişimi yoktur.
+// MongoDB, JWT_SECRET veya Cryptomus sırlarına erişimi yoktur.
 import { fork, ChildProcess } from 'child_process';
 import path from 'path';
 import { EventEmitter } from 'events';

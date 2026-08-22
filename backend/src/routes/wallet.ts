@@ -2,7 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
 import Transaction from '../models/Transaction';
-import { initializeDeposit, retrieveCheckoutForm } from '../services/iyzico';
+import { createInvoice, verifyWebhookSignature, PAID_STATUSES, CryptomusWebhookPayload } from '../services/cryptomus';
 import { config } from '../config';
 import { createNotification, sendCriticalEmail } from '../services/notifications';
 import { logger } from '../logger';
@@ -23,9 +23,13 @@ function authenticateToken(req: Request, res: Response, next: NextFunction) {
   });
 }
 
-const MIN_DEPOSIT = 10;
-const MAX_DEPOSIT = 50000;
-const MIN_WITHDRAW = 50;
+const MIN_DEPOSIT = 5; // USD
+const MAX_DEPOSIT = 10000; // USD
+const MIN_WITHDRAW = 10; // USD
+
+// Cryptomus'ta desteklediğimiz çekim ağları — kullanıcı bunlardan birini seçmek zorunda,
+// admin manuel gönderirken hangi ağa göndereceğini bu değerden anlar.
+const PAYOUT_NETWORKS = ['USDT_TRC20', 'USDT_BEP20', 'USDT_ERC20', 'BTC', 'ETH', 'TON'];
 
 /**
  * @swagger
@@ -68,7 +72,7 @@ router.get('/', authenticateToken, async (req, res) => {
       success: true,
       data: {
         balance: user.balance,
-        currency: 'TRY',
+        currency: 'USD',
         recentTransactions
       }
     });
@@ -130,48 +134,6 @@ router.get('/transactions', authenticateToken, async (req, res) => {
   }
 });
 
-/**
- * @swagger
- * /wallet/deposit:
- *   post:
- *     summary: Para yatırma başlat (iyzico Checkout Form oturumu oluşturur)
- *     tags: [Wallet]
- *     security: [{ bearerAuth: [] }]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [amount, name, surname, identityNumber, phone, address, city]
- *             properties:
- *               amount: { type: number, minimum: 10, maximum: 50000, description: '10-50000 TL' }
- *               name: { type: string }
- *               surname: { type: string }
- *               identityNumber: { type: string, description: '11 haneli TC Kimlik No' }
- *               phone: { type: string }
- *               address: { type: string }
- *               city: { type: string }
- *     responses:
- *       200:
- *         description: iyzico Checkout Form oturumu oluşturuldu
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data:
- *                   type: object
- *                   properties:
- *                     token: { type: string }
- *                     paymentPageUrl: { type: string }
- *                     checkoutFormContent: { type: string }
- *       400: { $ref: '#/components/responses/ServerError' }
- *       401: { $ref: '#/components/responses/Unauthorized' }
- *       502: { description: Ödeme sağlayıcıya bağlanılamadı }
- *       503: { description: Ödeme sağlayıcı yapılandırılmamış }
- */
 // TEST için sahte bakiye yükleme (sadece geliştirme amaçlı — production'da kapalıdır)
 router.post('/test-deposit', authenticateToken, async (req, res) => {
   if (config.server.nodeEnv === 'production') {
@@ -180,7 +142,7 @@ router.post('/test-deposit', authenticateToken, async (req, res) => {
   try {
     const userId = (req as any).user.userId;
     const { amount } = req.body;
-    
+
     const parsedAmount = Number(amount);
     if (!parsedAmount || parsedAmount <= 0) {
       return res.status(400).json({ success: false, message: 'Geçersiz tutar' });
@@ -201,31 +163,59 @@ router.post('/test-deposit', authenticateToken, async (req, res) => {
     });
     await transaction.save();
 
-    res.json({ success: true, message: `${parsedAmount} TRY test bakiyesi eklendi`, balance: user.balance });
+    res.json({ success: true, message: `${parsedAmount} USD test bakiyesi eklendi`, balance: user.balance });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Hata oluştu' });
   }
 });
 
-// Para yatırma başlat — iyzico Checkout Form oturumu oluşturur
+/**
+ * @swagger
+ * /wallet/deposit:
+ *   post:
+ *     summary: Para yatırma başlat (Cryptomus ödeme sayfası oturumu oluşturur)
+ *     tags: [Wallet]
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [amount]
+ *             properties:
+ *               amount: { type: number, minimum: 5, maximum: 10000, description: '5-10000 USD' }
+ *     responses:
+ *       200:
+ *         description: Cryptomus ödeme sayfası oturumu oluşturuldu
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     paymentPageUrl: { type: string }
+ *       400: { $ref: '#/components/responses/ServerError' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       502: { description: Ödeme sağlayıcıya bağlanılamadı }
+ *       503: { description: Ödeme sağlayıcı yapılandırılmamış }
+ */
+// Para yatırma başlat — Cryptomus ödeme sayfası (invoice) oturumu oluşturur
 router.post('/deposit', authenticateToken, async (req, res) => {
   try {
     const userId = (req as any).user.userId;
-    const { amount, name, surname, identityNumber, phone, address, city } = req.body;
+    const { amount } = req.body;
 
     const parsedAmount = Number(amount);
     if (!parsedAmount || parsedAmount < MIN_DEPOSIT || parsedAmount > MAX_DEPOSIT) {
-      return res.status(400).json({ success: false, message: `Tutar ${MIN_DEPOSIT}-${MAX_DEPOSIT} TL arasında olmalıdır` });
-    }
-    if (!name || !surname || !phone || !address || !city) {
-      return res.status(400).json({ success: false, message: 'Ad, soyad, telefon, adres ve şehir zorunludur' });
-    }
-    if (!identityNumber || !/^\d{11}$/.test(identityNumber)) {
-      return res.status(400).json({ success: false, message: 'Geçerli bir TC Kimlik No (11 hane) giriniz' });
+      return res.status(400).json({ success: false, message: `Tutar ${MIN_DEPOSIT}-${MAX_DEPOSIT} USD arasında olmalıdır` });
     }
 
-    if (!config.iyzico.apiKey || !config.iyzico.secretKey) {
-      return res.status(503).json({ success: false, message: 'Ödeme sağlayıcı henüz yapılandırılmamış. Lütfen backend/.env dosyasına iyzico API bilgilerinizi ekleyin.' });
+    if (!config.cryptomus.merchantId || !config.cryptomus.paymentApiKey) {
+      return res.status(503).json({ success: false, message: 'Ödeme sağlayıcı henüz yapılandırılmamış. Lütfen backend/.env dosyasına Cryptomus API bilgilerinizi ekleyin.' });
     }
 
     const user = await User.findById(userId);
@@ -236,53 +226,30 @@ router.post('/deposit', authenticateToken, async (req, res) => {
       type: 'deposit',
       amount: parsedAmount,
       status: 'pending',
-      description: 'Cüzdan bakiye yükleme'
+      description: 'Cüzdan bakiye yükleme (kripto)'
     });
     await transaction.save();
 
-    const callbackUrl = `${config.server.backendUrl}/api/wallet/deposit/callback`;
-    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
+    const callbackUrl = `${config.server.backendUrl}/api/wallet/deposit/webhook`;
+    const returnUrl = `${config.frontendUrl}/wallet?deposit=pending`;
 
     let result;
     try {
-      result = await initializeDeposit(
-        {
-          userId,
-          email: user.email,
-          name,
-          surname,
-          identityNumber,
-          phone,
-          address,
-          city,
-          ip
-        },
-        parsedAmount,
-        transaction._id.toString(),
-        callbackUrl
-      );
-    } catch (iyzicoError) {
-      console.error('iyzico initialize error:', iyzicoError);
+      result = await createInvoice(parsedAmount, transaction._id.toString(), callbackUrl, returnUrl);
+    } catch (cryptomusError) {
+      console.error('Cryptomus initialize error:', cryptomusError);
       transaction.status = 'failed';
       await transaction.save();
       return res.status(502).json({ success: false, message: 'Ödeme sağlayıcıya bağlanılamadı' });
     }
 
-    if (result.status !== 'success' || !result.token) {
-      transaction.status = 'failed';
-      await transaction.save();
-      return res.status(400).json({ success: false, message: result.errorMessage || 'Ödeme oturumu başlatılamadı' });
-    }
-
-    transaction.paymentToken = result.token;
+    transaction.paymentToken = result.uuid;
     await transaction.save();
 
     res.json({
       success: true,
       data: {
-        token: result.token,
-        paymentPageUrl: result.paymentPageUrl,
-        checkoutFormContent: result.checkoutFormContent
+        paymentPageUrl: result.url
       }
     });
   } catch (error) {
@@ -293,47 +260,52 @@ router.post('/deposit', authenticateToken, async (req, res) => {
 
 /**
  * @swagger
- * /wallet/deposit/callback:
+ * /wallet/deposit/webhook:
  *   post:
- *     summary: iyzico ödeme callback'i (tarayıcı yönlendirilir, doğrudan çağrılmamalı)
+ *     summary: Cryptomus ödeme webhook'u (sunucudan sunucuya çağrılır, doğrudan tarayıcıdan çağrılmaz)
  *     tags: [Wallet]
  *     security: []
- *     requestBody:
- *       content:
- *         application/x-www-form-urlencoded:
- *           schema:
- *             type: object
- *             properties:
- *               token: { type: string }
  *     responses:
- *       302: { description: 'Frontend /wallet sayfasına yönlendirir (?deposit=success|failed)' }
+ *       200: { description: 'Her zaman 200 döner (Cryptomus retry mekanizmasını tetiklememek için)' }
  */
-// iyzico ödeme tamamlandıktan sonra kullanıcının tarayıcısı buraya yönlendirilir
-router.post('/deposit/callback', async (req, res) => {
-  const frontendUrl = config.frontendUrl;
+// Cryptomus ödeme durumunu bildiren sunucu-to-sunucu webhook — gerçek bakiye artışı burada olur
+router.post('/deposit/webhook', async (req, res) => {
+  // Cryptomus imzası geçersizse veya işlem bulunamazsa bile 200 dönülür ki Cryptomus tekrar
+  // tekrar denemesin; hata sadece loglanır.
   try {
-    const token = req.body?.token as string;
-    if (!token) {
-      return res.redirect(302, `${frontendUrl}/wallet?deposit=failed`);
+    const payload = req.body as CryptomusWebhookPayload;
+
+    if (!verifyWebhookSignature(payload)) {
+      logger.warn({ event: 'cryptomus_webhook_invalid_signature' }, 'Cryptomus webhook imza doğrulaması başarısız');
+      return res.status(200).json({ success: false });
     }
 
-    const transaction = await Transaction.findOne({ paymentToken: token });
-    if (!transaction) {
-      return res.redirect(302, `${frontendUrl}/wallet?deposit=failed`);
+    const transaction = await Transaction.findById(payload.order_id);
+    if (!transaction || transaction.type !== 'deposit') {
+      logger.warn({ event: 'cryptomus_webhook_unknown_order', orderId: payload.order_id }, 'Cryptomus webhook: eşleşen işlem yok');
+      return res.status(200).json({ success: false });
     }
 
-    // Zaten işlenmişse (çift callback) tekrar bakiye ekleme
+    // Zaten işlenmişse (çift webhook) tekrar bakiye ekleme
     if (transaction.status !== 'pending') {
-      return res.redirect(302, `${frontendUrl}/wallet?deposit=${transaction.status === 'completed' ? 'success' : 'failed'}`);
+      return res.status(200).json({ success: true });
     }
 
-    const result = await retrieveCheckoutForm(token, transaction._id.toString());
+    if (!payload.is_final) {
+      // Ara durum (process/confirm_check vb.) — henüz kesinleşmedi, bekle
+      return res.status(200).json({ success: true });
+    }
 
-    if (result.status === 'success' && result.paymentStatus === 'SUCCESS') {
+    if (PAID_STATUSES.has(payload.status)) {
       // Çift ödeme sayımını önlemek için sadece 'pending' durumundaki işlemi tamamlanmışa çevir
       const claimed = await Transaction.findOneAndUpdate(
         { _id: transaction._id, status: 'pending' },
-        { status: 'completed' },
+        {
+          status: 'completed',
+          cryptoAmount: payload.payment_amount || payload.amount,
+          cryptoCurrency: payload.payer_currency || payload.currency,
+          cryptoNetwork: payload.network
+        },
         { new: true }
       );
 
@@ -351,36 +323,34 @@ router.post('/deposit/callback', async (req, res) => {
           'Bakiye yükleme tamamlandı'
         );
 
-        // Bildirim + kritik email — hata olursa callback akışını etkilemez
         try {
           await createNotification({
             user: transaction.user.toString(),
             type: 'deposit',
             title: 'Bakiye Yükleme Başarılı',
-            message: `${transaction.amount} TL bakiyenize yüklendi.`,
+            message: `${transaction.amount} USD bakiyenize yüklendi.`,
             relatedTransaction: claimed._id.toString()
           });
           if (updatedUser?.email) {
             await sendCriticalEmail(
               updatedUser.email,
               'Bakiye Yükleme Başarılı',
-              `<p><strong>${transaction.amount} TL</strong> bakiyenize başarıyla yüklendi.</p><p>Güncel bakiyeniz: ${updatedUser.balance} TL</p>`
+              `<p><strong>${transaction.amount} USD</strong> bakiyenize başarıyla yüklendi.</p><p>Güncel bakiyeniz: ${updatedUser.balance} USD</p>`
             );
           }
         } catch (notifyError) {
           console.error('Deposit notification error:', notifyError);
         }
       }
-
-      return res.redirect(302, `${frontendUrl}/wallet?deposit=success`);
+    } else {
+      transaction.status = 'failed';
+      await transaction.save();
     }
 
-    transaction.status = 'failed';
-    await transaction.save();
-    return res.redirect(302, `${frontendUrl}/wallet?deposit=failed`);
+    return res.status(200).json({ success: true });
   } catch (error) {
-    console.error('Deposit callback error:', error);
-    return res.redirect(302, `${frontendUrl}/wallet?deposit=failed`);
+    console.error('Deposit webhook error:', error);
+    return res.status(200).json({ success: false });
   }
 });
 
@@ -388,7 +358,7 @@ router.post('/deposit/callback', async (req, res) => {
  * @swagger
  * /wallet/withdraw:
  *   post:
- *     summary: Para çekme talebi oluştur (bakiye anında düşülür, transfer manuel işlenir)
+ *     summary: Kripto para çekme talebi oluştur (bakiye anında düşülür, coin transferi manuel işlenir)
  *     tags: [Wallet]
  *     security: [{ bearerAuth: [] }]
  *     requestBody:
@@ -397,10 +367,11 @@ router.post('/deposit/callback', async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [amount, iban]
+ *             required: [amount, walletAddress, network]
  *             properties:
- *               amount: { type: number, minimum: 50, description: 'En az 50 TL' }
- *               iban: { type: string }
+ *               amount: { type: number, minimum: 10, description: 'En az 10 USD' }
+ *               walletAddress: { type: string }
+ *               network: { type: string, enum: [USDT_TRC20, USDT_BEP20, USDT_ERC20, BTC, ETH, TON] }
  *     responses:
  *       200:
  *         description: Talep alındı
@@ -416,21 +387,24 @@ router.post('/deposit/callback', async (req, res) => {
  *                   properties:
  *                     balance: { type: number }
  *                     transaction: { $ref: '#/components/schemas/Transaction' }
- *       400: { description: 'Yetersiz bakiye / geçersiz IBAN' }
+ *       400: { description: 'Yetersiz bakiye / geçersiz adres ya da ağ' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  */
-// Para çekme talebi oluştur — bakiye hemen düşülür, transfer manuel işlenir
+// Kripto çekim talebi oluştur — bakiye hemen düşülür, coin transferi admin tarafından manuel gönderilir
 router.post('/withdraw', authenticateToken, async (req, res) => {
   try {
     const userId = (req as any).user.userId;
-    const { amount, iban } = req.body;
+    const { amount, walletAddress, network } = req.body;
 
     const parsedAmount = Number(amount);
     if (!parsedAmount || parsedAmount < MIN_WITHDRAW) {
-      return res.status(400).json({ success: false, message: `Tutar en az ${MIN_WITHDRAW} TL olmalıdır` });
+      return res.status(400).json({ success: false, message: `Tutar en az ${MIN_WITHDRAW} USD olmalıdır` });
     }
-    if (!iban || iban.replace(/\s/g, '').length < 15) {
-      return res.status(400).json({ success: false, message: 'Geçerli bir IBAN giriniz' });
+    if (!walletAddress || String(walletAddress).trim().length < 10) {
+      return res.status(400).json({ success: false, message: 'Geçerli bir cüzdan adresi giriniz' });
+    }
+    if (!network || !PAYOUT_NETWORKS.includes(network)) {
+      return res.status(400).json({ success: false, message: 'Geçerli bir ağ seçiniz' });
     }
 
     // Bakiyeyi atomik olarak düş — yetersiz bakiye varsa güncelleme eşleşmez
@@ -450,12 +424,14 @@ router.post('/withdraw', authenticateToken, async (req, res) => {
       amount: -parsedAmount,
       balanceAfter: updatedUser.balance,
       status: 'pending',
-      description: `Para çekme talebi (IBAN: ${iban})`
+      payoutAddress: walletAddress,
+      payoutNetwork: network,
+      description: `Kripto çekme talebi (${network}): ${walletAddress}`
     });
     await transaction.save();
 
     logger.info(
-      { event: 'withdrawal_requested', userId, amount: parsedAmount, transactionId: transaction._id },
+      { event: 'withdrawal_requested', userId, amount: parsedAmount, network, transactionId: transaction._id },
       'Para çekme talebi oluşturuldu'
     );
 
@@ -464,7 +440,7 @@ router.post('/withdraw', authenticateToken, async (req, res) => {
         user: userId,
         type: 'withdrawal',
         title: 'Para Çekme Talebi Alındı',
-        message: `${parsedAmount} TL çekme talebiniz alındı. Tutar 1-3 iş günü içinde IBAN'ınıza aktarılacaktır.`,
+        message: `${parsedAmount} USD çekme talebiniz alındı. Coin 1-3 iş günü içinde belirttiğiniz adrese gönderilecektir.`,
         relatedTransaction: transaction._id.toString()
       });
     } catch (notifyError) {
@@ -473,7 +449,7 @@ router.post('/withdraw', authenticateToken, async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Para çekme talebiniz alındı. Tutar 1-3 iş günü içinde IBAN\'ınıza aktarılacaktır.',
+      message: 'Para çekme talebiniz alındı. Coin 1-3 iş günü içinde belirttiğiniz adrese gönderilecektir.',
       data: { balance: updatedUser.balance, transaction }
     });
   } catch (error) {

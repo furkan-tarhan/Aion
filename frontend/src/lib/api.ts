@@ -187,8 +187,8 @@ export const walletApi = {
     getTransactions: (page = 1, limit = 20) =>
         request<{ success: boolean; data: any[]; pagination: any }>(`/api/wallet/transactions?page=${page}&limit=${limit}`),
 
-    deposit: (data: { amount: number; name: string; surname: string; identityNumber: string; phone: string; address: string; city: string }) =>
-        request<{ success: boolean; message?: string; data: { token: string; paymentPageUrl: string; checkoutFormContent?: string } }>('/api/wallet/deposit', {
+    deposit: (data: { amount: number }) =>
+        request<{ success: boolean; message?: string; data: { paymentPageUrl: string } }>('/api/wallet/deposit', {
             method: 'POST',
             body: JSON.stringify(data),
         }),
@@ -199,7 +199,7 @@ export const walletApi = {
             body: JSON.stringify({ amount }),
         }),
 
-    withdraw: (data: { amount: number; iban: string }) =>
+    withdraw: (data: { amount: number; walletAddress: string; network: string }) =>
         request<{ success: boolean; message: string; data: { balance: number; transaction: any } }>('/api/wallet/withdraw', {
             method: 'POST',
             body: JSON.stringify(data),
@@ -284,6 +284,25 @@ export const adminApi = {
     removeListing: (id: string, reason?: string) =>
         request<{ success: boolean; message: string }>(`/api/admin/listings/${id}`, {
             method: 'DELETE',
+            body: JSON.stringify({ reason }),
+        }),
+
+    getWithdrawals: (params?: { page?: number; limit?: number; status?: string }) => {
+        const query = new URLSearchParams();
+        if (params?.page) query.set('page', String(params.page));
+        if (params?.limit) query.set('limit', String(params.limit));
+        if (params?.status) query.set('status', params.status);
+        return request<{ success: boolean; data: any[]; pagination: any }>(`/api/admin/withdrawals?${query.toString()}`);
+    },
+
+    completeWithdrawal: (id: string) =>
+        request<{ success: boolean; message: string }>(`/api/admin/withdrawals/${id}/complete`, {
+            method: 'PATCH',
+        }),
+
+    rejectWithdrawal: (id: string, reason?: string) =>
+        request<{ success: boolean; message: string; data: any }>(`/api/admin/withdrawals/${id}/reject`, {
+            method: 'PATCH',
             body: JSON.stringify({ reason }),
         }),
 

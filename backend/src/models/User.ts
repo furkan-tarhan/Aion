@@ -23,7 +23,7 @@ export interface IUser extends Document {
     profileUrl?: string;
   };
   favorites: string[]; // skin id'leri
-  balance: number; // TRY cüzdan bakiyesi
+  balance: number; // USD cüzdan bakiyesi (kripto ödemeler Cryptomus üzerinden USD karşılığı olarak işlenir)
   role: 'user' | 'admin';
   isBanned: boolean;
   bannedAt?: Date;

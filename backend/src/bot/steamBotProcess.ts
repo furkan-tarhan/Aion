@@ -1,6 +1,6 @@
 // Steam trade bot — AYRI BİR CHILD PROCESS olarak çalışır (bkz. services/steamBot.ts'deki fork).
 // Bilinçli izolasyon: bu process'e sadece STEAM_BOT_* env değişkenleri verilir — MONGO_URI,
-// JWT_SECRET, IYZICO_* gibi hiçbir hassas bilgiye erişimi yoktur. steamcommunity/steam-tradeoffer-manager
+// JWT_SECRET, CRYPTOMUS_* gibi hiçbir hassas bilgiye erişimi yoktur. steamcommunity/steam-tradeoffer-manager
 // paketlerinin bağımlılık zincirinde (eski `request` kütüphanesi üzerinden) düzeltmesi olmayan
 // güvenlik açıkları var (bkz. commit mesajı / PROJECT_STATUS.md); bu process'in DB'ye veya diğer
 // sırlara erişememesi, bu bağımlılık zincirinde bir açık istismar edilse bile blast radius'u

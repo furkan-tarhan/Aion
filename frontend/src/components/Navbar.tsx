@@ -62,7 +62,7 @@ const Navbar = () => {
   }, [isAuthenticated]);
 
   const formatBalance = (value: number) =>
-    new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(value);
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 
   // Dropdown dışına tıklandığında kapat
   useEffect(() => {

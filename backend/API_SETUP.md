@@ -20,28 +20,20 @@ EMAIL_PASS=<gmail-app-password>
 FRONTEND_URL=http://localhost:3000
 BACKEND_URL=http://localhost:5000
 STEAM_API_KEY=<steam-api-key>
-IYZICO_API_KEY=<iyzico-sandbox-api-key>
-IYZICO_SECRET_KEY=<iyzico-sandbox-secret-key>
-IYZICO_BASE_URL=https://sandbox-api.iyzipay.com
+CRYPTOMUS_MERCHANT_ID=<cryptomus-merchant-id>
+CRYPTOMUS_PAYMENT_API_KEY=<cryptomus-payment-api-key>
+CRYPTOMUS_BASE_URL=https://api.cryptomus.com/v1
 ```
 
-### iyzico Sandbox (Test) Hesabı Kurulumu
+### Cryptomus Hesap Kurulumu
 
-1. https://sandbox-merchant.iyzipay.com adresinden ücretsiz bir sandbox/test hesabı oluşturun
-2. Panelde **Ayarlar → API Entegrasyonu** bölümünden sandbox `API Key` ve `Secret Key` değerlerini alın
-3. Bu değerleri `backend/.env` dosyasındaki `IYZICO_API_KEY` / `IYZICO_SECRET_KEY` alanlarına yazın
-4. Canlıya geçerken `IYZICO_BASE_URL`'i `https://api.iyzipay.com` yapıp gerçek (production) key'leri kullanmanız gerekir
-5. Test ödemesi yaparken aşağıdaki sandbox test kartlarından birini kullanabilirsiniz (gerçek para çekilmez):
+1. https://app.cryptomus.com adresinden ücretsiz bir merchant hesabı oluşturun (KYC gerekebilir)
+2. Panelde bir **mağaza (store)** oluşturun; **Merchant ID**'yi panelin ana sayfasından/ayarlarından kopyalayın
+3. **API → Payment API Key**'i alın (payout/withdraw API key'i ayrı bir anahtardır, şu an kullanılmıyor — bkz. `docs/PROJECT_STATUS.md`)
+4. Bu değerleri `backend/.env` dosyasındaki `CRYPTOMUS_MERCHANT_ID` / `CRYPTOMUS_PAYMENT_API_KEY` alanlarına yazın
+5. Cryptomus'un kendi test/sandbox modu yoktur — küçük tutarlı gerçek bir kripto ödemesiyle test etmeniz gerekir (örn. minimum tutara yakın bir USDT ödemesi)
 
-| Kart Numarası | Banka | Tip |
-|---|---|---|
-| 5528790000000008 | Halkbank | Master Card (Kredi) |
-| 4059030000000009 | HSBC Bank | Visa (Banka) |
-| 4111111111111129 | — | Yetersiz bakiye hatası (test) |
-
-> Son kullanma tarihi ve CVC için ileri bir tarih ve herhangi bir 3 haneli sayı kullanabilirsiniz (örn. 12/2030, CVC: 123).
-
-> **Not:** iyzico callback akışında kullanıcının kendi tarayıcısı `callbackUrl`'e yönlendirilir (sunucudan sunucuya çağrı değildir). Bu nedenle lokal geliştirmede `BACKEND_URL=http://localhost:5000` ile test edebilirsiniz, ngrok/tünel gerekmez.
+> **Not:** Cryptomus'ta ödeme onayı `url_callback`'e (bizde `POST /api/wallet/deposit/webhook`) sunucudan sunucuya gönderilen bir webhook ile gelir — kullanıcının tarayıcısı sadece `url_return`'e (`/wallet?deposit=pending`) yönlendirilir, bakiye orada artmaz. Lokal geliştirmede webhook'un backend'inize ulaşabilmesi için `BACKEND_URL`'in dışarıdan erişilebilir olması gerekir (örn. `ngrok http 5000` ile bir tünel açıp `BACKEND_URL`'i tünel adresine ayarlayın).
 
 ---
 
@@ -98,13 +90,13 @@ IYZICO_BASE_URL=https://sandbox-api.iyzipay.com
 |--------|----------|------|----------|
 | `GET` | `/api/wallet` | ✅ | Bakiye + son 10 işlem |
 | `GET` | `/api/wallet/transactions` | ✅ | Sayfalanmış işlem geçmişi |
-| `POST` | `/api/wallet/deposit` | ✅ | iyzico Checkout Form oturumu başlatır, `paymentPageUrl` döner |
-| `POST` | `/api/wallet/deposit/callback` | ❌ | iyzico ödeme sonrası kullanıcı tarayıcısını buraya yönlendirir (dahili kullanım) |
-| `POST` | `/api/wallet/withdraw` | ✅ | Para çekme talebi oluşturur (bakiye anında düşülür, transfer manuel işlenir) |
+| `POST` | `/api/wallet/deposit` | ✅ | Cryptomus ödeme sayfası (invoice) oluşturur, `paymentPageUrl` döner |
+| `POST` | `/api/wallet/deposit/webhook` | ❌ | Cryptomus'un sunucudan sunucuya gönderdiği ödeme onayı (dahili kullanım, imza doğrulanır) |
+| `POST` | `/api/wallet/withdraw` | ✅ | Kripto çekme talebi oluşturur (bakiye anında düşülür, coin transferi manuel işlenir) |
 
-**Deposit body:** `{ amount, name, surname, identityNumber, phone, address, city }` — iyzico'nun zorunlu alıcı bilgisi alanları.
+**Deposit body:** `{ amount }` — USD cinsinden tutar; kullanıcı hangi kripto para/ağla ödeyeceğini Cryptomus'un ödeme sayfasında seçer.
 
-**Withdraw body:** `{ amount, iban }`
+**Withdraw body:** `{ amount, walletAddress, network }` — `network`: `USDT_TRC20` | `USDT_BEP20` | `USDT_ERC20` | `BTC` | `ETH` | `TON`
 
 ### İlan Satın Alma (`/api/listings/:id/buy`)
 

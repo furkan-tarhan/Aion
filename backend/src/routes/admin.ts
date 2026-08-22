@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User';
 import Listing from '../models/Listing';
 import Skin from '../models/Skin';
+import Transaction from '../models/Transaction';
 import { requireAdmin } from '../middleware/adminAuth';
 import { createNotification, sendCriticalEmail } from '../services/notifications';
 import { logger } from '../logger';
@@ -489,6 +490,187 @@ router.delete('/listings/:id', async (req: Request, res: Response) => {
     res.json({ success: true, message: 'İlan kaldırıldı' });
   } catch (error) {
     console.error('İlan kaldırma hatası:', error);
+    res.status(500).json({ success: false, message: 'Sunucu hatası' });
+  }
+});
+
+/**
+ * @swagger
+ * /admin/withdrawals:
+ *   get:
+ *     summary: Kripto çekim taleplerini listele (varsayılan sadece bekleyenler)
+ *     tags: [Admin]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: query, name: page, schema: { type: integer, default: 1 } }
+ *       - { in: query, name: limit, schema: { type: integer, default: 20 } }
+ *       - { in: query, name: status, schema: { type: string, enum: [pending, completed, failed, all] }, description: 'Varsayılan: pending' }
+ *     responses:
+ *       200:
+ *         description: Çekim talebi listesi + pagination
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data: { type: array, items: { $ref: '#/components/schemas/Transaction' } }
+ *                 pagination: { $ref: '#/components/schemas/Pagination' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+// Kripto çekim talepleri (admin manuel coin gönderimi için takip listesi)
+router.get('/withdrawals', async (req: Request, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const skip = (page - 1) * limit;
+    const status = (req.query.status as string) || 'pending';
+
+    const filter: Record<string, any> = { type: 'withdrawal' };
+    if (status !== 'all') filter.status = status;
+
+    const [withdrawals, total] = await Promise.all([
+      Transaction.find(filter)
+        .populate('user', 'username email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Transaction.countDocuments(filter)
+    ]);
+
+    res.json({
+      success: true,
+      data: withdrawals,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) }
+    });
+  } catch (error) {
+    console.error('Admin çekim listesi hatası:', error);
+    res.status(500).json({ success: false, message: 'Sunucu hatası' });
+  }
+});
+
+/**
+ * @swagger
+ * /admin/withdrawals/{id}/complete:
+ *   patch:
+ *     summary: Çekim talebini tamamlandı olarak işaretle (coin admin tarafından manuel gönderildikten sonra)
+ *     tags: [Admin]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Çekim talebi tamamlandı olarak işaretlendi }
+ *       400: { description: 'Talep zaten işlenmiş' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+// Çekim talebini tamamlandı işaretle — coin gönderildikten sonra admin burayı tıklar
+router.patch('/withdrawals/:id/complete', async (req: Request, res: Response) => {
+  try {
+    const adminId = (req as any).user.userId;
+    const transaction = await Transaction.findOne({ _id: req.params.id, type: 'withdrawal' });
+    if (!transaction) {
+      return res.status(404).json({ success: false, message: 'Çekim talebi bulunamadı' });
+    }
+    if (transaction.status !== 'pending') {
+      return res.status(400).json({ success: false, message: 'Bu talep zaten işlenmiş' });
+    }
+
+    transaction.status = 'completed';
+    await transaction.save();
+
+    logger.info(
+      { event: 'admin_withdrawal_completed', adminId, transactionId: transaction._id, userId: transaction.user },
+      'Admin çekim talebini tamamlandı işaretledi'
+    );
+
+    try {
+      await createNotification({
+        user: transaction.user.toString(),
+        type: 'withdrawal',
+        title: 'Çekiminiz Gönderildi',
+        message: `${Math.abs(transaction.amount)} USD tutarındaki kripto çekiminiz gönderildi.`,
+        relatedTransaction: transaction._id.toString()
+      });
+    } catch (notifyError) {
+      console.error('Withdrawal complete bildirim hatası:', notifyError);
+    }
+
+    res.json({ success: true, message: 'Çekim talebi tamamlandı olarak işaretlendi' });
+  } catch (error) {
+    console.error('Çekim tamamlama hatası:', error);
+    res.status(500).json({ success: false, message: 'Sunucu hatası' });
+  }
+});
+
+/**
+ * @swagger
+ * /admin/withdrawals/{id}/reject:
+ *   patch:
+ *     summary: Çekim talebini reddet (bakiye kullanıcıya iade edilir)
+ *     tags: [Admin]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason: { type: string }
+ *     responses:
+ *       200: { description: Çekim talebi reddedildi, bakiye iade edildi }
+ *       400: { description: 'Talep zaten işlenmiş' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+// Çekim talebini reddet — örn. geçersiz/ulaşılamayan adres — bakiye kullanıcıya geri eklenir
+router.patch('/withdrawals/:id/reject', async (req: Request, res: Response) => {
+  try {
+    const adminId = (req as any).user.userId;
+    const { reason } = req.body;
+    const transaction = await Transaction.findOne({ _id: req.params.id, type: 'withdrawal' });
+    if (!transaction) {
+      return res.status(404).json({ success: false, message: 'Çekim talebi bulunamadı' });
+    }
+    if (transaction.status !== 'pending') {
+      return res.status(400).json({ success: false, message: 'Bu talep zaten işlenmiş' });
+    }
+
+    const refundAmount = Math.abs(transaction.amount);
+    transaction.status = 'failed';
+    await transaction.save();
+
+    const updatedUser = await User.findByIdAndUpdate(
+      transaction.user,
+      { $inc: { balance: refundAmount } },
+      { new: true }
+    );
+
+    logger.warn(
+      { event: 'admin_withdrawal_rejected', adminId, transactionId: transaction._id, userId: transaction.user, reason },
+      'Admin çekim talebini reddetti, bakiye iade edildi'
+    );
+
+    try {
+      await createNotification({
+        user: transaction.user.toString(),
+        type: 'withdrawal',
+        title: 'Çekim Talebiniz Reddedildi',
+        message: reason
+          ? `${refundAmount} USD tutarındaki çekim talebiniz reddedildi ve bakiyenize iade edildi. Sebep: ${reason}`
+          : `${refundAmount} USD tutarındaki çekim talebiniz reddedildi ve bakiyenize iade edildi.`,
+        relatedTransaction: transaction._id.toString()
+      });
+    } catch (notifyError) {
+      console.error('Withdrawal reject bildirim hatası:', notifyError);
+    }
+
+    res.json({ success: true, message: 'Çekim talebi reddedildi, bakiye iade edildi', data: { balance: updatedUser?.balance } });
+  } catch (error) {
+    console.error('Çekim reddetme hatası:', error);
     res.status(500).json({ success: false, message: 'Sunucu hatası' });
   }
 });

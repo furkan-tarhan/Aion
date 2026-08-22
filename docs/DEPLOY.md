@@ -69,9 +69,9 @@ ADMIN_EMAILS=senin@email.com
 EMAIL_USER=
 EMAIL_PASS=
 STEAM_API_KEY=
-IYZICO_API_KEY=
-IYZICO_SECRET_KEY=
-IYZICO_BASE_URL=https://sandbox-api.iyzipay.com
+CRYPTOMUS_MERCHANT_ID=
+CRYPTOMUS_PAYMENT_API_KEY=
+CRYPTOMUS_BASE_URL=https://api.cryptomus.com/v1
 LOG_TO_FILE=false
 LOG_LEVEL=info
 # Opsiyonel:

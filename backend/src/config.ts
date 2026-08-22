@@ -48,10 +48,10 @@ export const config = {
     .map(e => e.trim().toLowerCase())
     .filter(Boolean),
 
-  // iyzico Ödeme Sağlayıcı Konfigürasyonu (sandbox/test modu)
-  iyzico: {
-    apiKey: process.env.IYZICO_API_KEY || '',
-    secretKey: process.env.IYZICO_SECRET_KEY || '',
-    baseUrl: process.env.IYZICO_BASE_URL || 'https://sandbox-api.iyzipay.com',
+  // Cryptomus Ödeme Sağlayıcı Konfigürasyonu (kripto para ile ödeme — https://cryptomus.com)
+  cryptomus: {
+    merchantId: process.env.CRYPTOMUS_MERCHANT_ID || '',
+    paymentApiKey: process.env.CRYPTOMUS_PAYMENT_API_KEY || '',
+    baseUrl: process.env.CRYPTOMUS_BASE_URL || 'https://api.cryptomus.com/v1',
   }
-}; 
+};

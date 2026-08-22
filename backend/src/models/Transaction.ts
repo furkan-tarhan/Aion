@@ -12,8 +12,15 @@ export interface ITransaction {
   status: TransactionStatus;
   listing?: Types.ObjectId;
   counterparty?: Types.ObjectId;
-  paymentToken?: string;
+  paymentToken?: string; // 'deposit' işlemlerinde Cryptomus invoice uuid'i
   description?: string;
+  // 'deposit' işleminde webhook'tan gelen gerçek ödeme bilgisi (kullanıcı hangi coin/ağ ile ödedi)
+  cryptoAmount?: string;
+  cryptoCurrency?: string;
+  cryptoNetwork?: string;
+  // 'withdrawal' işleminde kullanıcının verdiği çekim adresi (admin bu adrese manuel coin gönderir)
+  payoutAddress?: string;
+  payoutNetwork?: string;
   // 'purchase' işlemlerinde Steam trade bot teslimat durumu (bot yapılandırılmamışsa boş kalır)
   deliveryOfferId?: string;
   deliveryStatus?: DeliveryStatus;
@@ -41,6 +48,11 @@ const TransactionSchema = new Schema<ITransaction>({
   counterparty: { type: Schema.Types.ObjectId, ref: 'User' },
   paymentToken: { type: String, index: true },
   description: { type: String },
+  cryptoAmount: { type: String },
+  cryptoCurrency: { type: String },
+  cryptoNetwork: { type: String },
+  payoutAddress: { type: String },
+  payoutNetwork: { type: String },
   deliveryOfferId: { type: String, index: true },
   deliveryStatus: { type: String, enum: ['pending', 'accepted', 'declined', 'canceled', 'expired', 'escrow'] }
 }, {

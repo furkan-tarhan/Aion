@@ -26,7 +26,7 @@ const formatPrice = (price: number, currency = 'USD') => {
     }).format(price);
 };
 
-type Tab = 'overview' | 'users' | 'listings' | 'apidocs';
+type Tab = 'overview' | 'users' | 'listings' | 'withdrawals' | 'apidocs';
 
 export default function AdminPage() {
     const t = useTranslations('admin');
@@ -39,6 +39,9 @@ export default function AdminPage() {
         active: t('statusActive'),
         sold: t('statusSold'),
         cancelled: t('statusCancelled'),
+        pending: t('statusPending'),
+        completed: t('statusCompleted'),
+        failed: t('statusFailed'),
     };
 
     const formatDate = (dateStr: string) =>
@@ -62,6 +65,12 @@ export default function AdminPage() {
     const [listingStatusFilter, setListingStatusFilter] = useState('');
     const [listingSearch, setListingSearch] = useState('');
     const [listingPagination, setListingPagination] = useState({ page: 1, pages: 1, total: 0 });
+
+    // Çekimler (kripto withdrawal talepleri)
+    const [withdrawals, setWithdrawals] = useState<any[]>([]);
+    const [withdrawalsLoading, setWithdrawalsLoading] = useState(true);
+    const [withdrawalStatusFilter, setWithdrawalStatusFilter] = useState('pending');
+    const [withdrawalPagination, setWithdrawalPagination] = useState({ page: 1, pages: 1, total: 0 });
 
     // API Dokümantasyonu (Swagger)
     const [apiSpec, setApiSpec] = useState<any>(null);
@@ -119,6 +128,25 @@ export default function AdminPage() {
         }
     }, [listingPagination.page, listingStatusFilter, listingSearch]);
 
+    const fetchWithdrawals = useCallback(async () => {
+        try {
+            setWithdrawalsLoading(true);
+            const data = await adminApi.getWithdrawals({
+                page: withdrawalPagination.page,
+                limit: 20,
+                status: withdrawalStatusFilter || undefined,
+            });
+            if (data.success) {
+                setWithdrawals(data.data);
+                setWithdrawalPagination(prev => ({ ...prev, pages: data.pagination.pages, total: data.pagination.total }));
+            }
+        } catch {
+            setWithdrawals([]);
+        } finally {
+            setWithdrawalsLoading(false);
+        }
+    }, [withdrawalPagination.page, withdrawalStatusFilter]);
+
     const fetchApiDocs = useCallback(() => {
         setApiSpecLoading(true);
         setApiSpecError(false);
@@ -133,9 +161,10 @@ export default function AdminPage() {
         if (activeTab === 'overview') fetchStats();
         if (activeTab === 'users') fetchUsers();
         if (activeTab === 'listings') fetchListings();
+        if (activeTab === 'withdrawals') fetchWithdrawals();
         if (activeTab === 'apidocs' && !apiSpec) fetchApiDocs();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isAdmin, activeTab, fetchUsers, fetchListings]);
+    }, [isAdmin, activeTab, fetchUsers, fetchListings, fetchWithdrawals]);
 
     const showMessage = (text: string, type: 'success' | 'error') => {
         setMessage({ text, type });
@@ -186,6 +215,29 @@ export default function AdminPage() {
             fetchListings();
         } catch (err: any) {
             showMessage(err.message || t('listingRemoveFailed'), 'error');
+        }
+    };
+
+    const handleCompleteWithdrawal = async (w: any) => {
+        if (!confirm(t('completeWithdrawalConfirm', { amount: formatPrice(Math.abs(w.amount)), address: w.payoutAddress }))) return;
+        try {
+            await adminApi.completeWithdrawal(w._id);
+            showMessage(t('withdrawalCompleted'), 'success');
+            fetchWithdrawals();
+        } catch (err: any) {
+            showMessage(err.message || t('actionFailed'), 'error');
+        }
+    };
+
+    const handleRejectWithdrawal = async (w: any) => {
+        const reason = window.prompt(t('rejectWithdrawalPromptReason'));
+        if (reason === null) return;
+        try {
+            await adminApi.rejectWithdrawal(w._id, reason || undefined);
+            showMessage(t('withdrawalRejected'), 'success');
+            fetchWithdrawals();
+        } catch (err: any) {
+            showMessage(err.message || t('actionFailed'), 'error');
         }
     };
 
@@ -261,6 +313,7 @@ export default function AdminPage() {
                             { id: 'overview', label: t('tabOverview') },
                             { id: 'users', label: t('tabUsers') },
                             { id: 'listings', label: t('tabListings') },
+                            { id: 'withdrawals', label: t('tabWithdrawals') },
                             { id: 'apidocs', label: t('tabApiDocs') },
                         ] as { id: Tab; label: string }[]).map(tab => (
                             <button
@@ -497,6 +550,79 @@ export default function AdminPage() {
                             </div>
 
                             <Pagination pagination={listingPagination} setPagination={setListingPagination} />
+                        </div>
+                    )}
+
+                    {/* Çekimler */}
+                    {activeTab === 'withdrawals' && (
+                        <div>
+                            <div className="flex flex-wrap gap-3 mb-6">
+                                <select
+                                    value={withdrawalStatusFilter}
+                                    onChange={e => { setWithdrawalStatusFilter(e.target.value); setWithdrawalPagination(p => ({ ...p, page: 1 })); }}
+                                    className="px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="pending">{t('statusPending')}</option>
+                                    <option value="completed">{t('statusCompleted')}</option>
+                                    <option value="failed">{t('statusFailed')}</option>
+                                    <option value="all">{t('all')}</option>
+                                </select>
+                            </div>
+
+                            <div className="bg-white/90 dark:bg-blue-900/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-blue-800 overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="text-left border-b border-gray-200 dark:border-blue-800 text-gray-500 dark:text-gray-400">
+                                            <th className="p-3">{t('columnUser')}</th>
+                                            <th className="p-3">{t('columnAmount')}</th>
+                                            <th className="p-3">{t('columnNetwork')}</th>
+                                            <th className="p-3">{t('columnWalletAddress')}</th>
+                                            <th className="p-3">{t('columnStatus')}</th>
+                                            <th className="p-3">{t('columnCreatedAt')}</th>
+                                            <th className="p-3">{t('columnActions')}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {withdrawalsLoading ? (
+                                            <tr><td colSpan={7} className="p-6 text-center text-gray-500 dark:text-gray-400">{t('loading')}</td></tr>
+                                        ) : withdrawals.length === 0 ? (
+                                            <tr><td colSpan={7} className="p-6 text-center text-gray-500 dark:text-gray-400">{t('noWithdrawalsFound')}</td></tr>
+                                        ) : (
+                                            withdrawals.map(w => (
+                                                <tr key={w._id} className="border-b border-gray-100 dark:border-gray-700 last:border-0">
+                                                    <td className="p-3">
+                                                        <p className="font-medium">{w.user?.username || t('unknown')}</p>
+                                                        <p className="text-gray-500 dark:text-gray-400 text-xs">{w.user?.email}</p>
+                                                    </td>
+                                                    <td className="p-3 font-semibold">{formatPrice(Math.abs(w.amount))}</td>
+                                                    <td className="p-3 text-gray-500 dark:text-gray-400">{w.payoutNetwork}</td>
+                                                    <td className="p-3 text-gray-500 dark:text-gray-400 max-w-[220px] truncate" title={w.payoutAddress}>{w.payoutAddress}</td>
+                                                    <td className="p-3">
+                                                        <span className={`text-xs font-bold px-2 py-1 rounded-full text-white ${w.status === 'completed' ? 'bg-green-500' : w.status === 'failed' ? 'bg-red-500' : 'bg-yellow-500'}`}>
+                                                            {statusLabels[w.status] || w.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-3 text-gray-500 dark:text-gray-400">{formatDate(w.createdAt)}</td>
+                                                    <td className="p-3">
+                                                        {w.status === 'pending' && (
+                                                            <div className="flex gap-3">
+                                                                <button onClick={() => handleCompleteWithdrawal(w)} className="text-green-600 dark:text-green-400 hover:underline text-xs font-medium">
+                                                                    {t('markCompleted')}
+                                                                </button>
+                                                                <button onClick={() => handleRejectWithdrawal(w)} className="text-red-600 dark:text-red-400 hover:underline text-xs font-medium">
+                                                                    {t('rejectAction')}
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <Pagination pagination={withdrawalPagination} setPagination={setWithdrawalPagination} />
                         </div>
                     )}
 

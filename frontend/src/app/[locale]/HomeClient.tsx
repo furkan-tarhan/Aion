@@ -179,7 +179,7 @@ export default function HomeClient() {
                     </div>
                     <div className="text-xs text-accent font-bold mb-1">{listing.skin?.rarity || 'CS2 Skin'}</div>
                     <div className="font-bold text-sm truncate mb-1 group-hover:text-accent transition-colors">{listing.title}</div>
-                    <div className="text-lg font-bold mt-auto pt-3 text-foreground">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: listing.currency || 'TRY' }).format(listing.price)}</div>
+                    <div className="text-lg font-bold mt-auto pt-3 text-foreground">{new Intl.NumberFormat('en-US', { style: 'currency', currency: listing.currency || 'USD' }).format(listing.price)}</div>
                     <div className="mt-4 bg-background text-center py-2 rounded font-semibold text-sm group-hover:bg-accent group-hover:text-[#191816] transition-colors">Hemen Al</div>
                 </div>
               ))

@@ -266,7 +266,7 @@ export default function ProfilePage() {
                                                 <p className="text-sm opacity-80">{t('walletBalance')}</p>
                                                 <p className="text-2xl font-bold">
                                                     {balance !== null
-                                                        ? new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(balance)
+                                                        ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(balance)
                                                         : '...'}
                                                 </p>
                                             </div>
